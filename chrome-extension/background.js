@@ -58,6 +58,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
       return true; // Keep message channel open for async response
+    } else if (message.type === 'ADD_TEST_CALENDAR_TASK') {
+      globalThis.addTestCalendarTask().then(() => {
+        sendResponse({ success: true });
+      }).catch(error => {
+        console.error('Error handling ADD_TEST_CALENDAR_TASK:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+      return true; // Keep message channel open for async response
     }
   } catch (error) {
     console.error('Error in message listener:', error);
@@ -155,4 +163,30 @@ globalThis.addTestEmailTask = async function() {
   
   await handleAddTask(testTask);
   console.log('Test email task added');
+};
+
+globalThis.addTestCalendarTask = async function() {
+  // Create a test calendar event for tomorrow at 2 PM, 1 hour duration
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(14, 0, 0, 0); // 2 PM
+  
+  const endTime = new Date(tomorrow);
+  endTime.setHours(15, 0, 0, 0); // 3 PM
+  
+  const testTask = {
+    type: 'calendar',
+    data: {
+      title: 'TEDAI Test Meeting',
+      description: 'This is a test calendar event created by the TEDAI AI Agent to demonstrate calendar functionality.',
+      startTime: tomorrow.toISOString(),
+      endTime: endTime.toISOString(),
+      attendees: ['colleague@example.com', 'manager@example.com'],
+      location: 'Conference Room A',
+      reminder: 15 // 15 minutes before
+    }
+  };
+  
+  await handleAddTask(testTask);
+  console.log('Test calendar task added');
 };
