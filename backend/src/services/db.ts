@@ -23,7 +23,7 @@ export function initDatabase(): Promise<void> {
           session_id TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`,
-        (err) => {
+        (err: Error | null) => {
           if (err) reject(err);
           else resolve();
         }
@@ -41,7 +41,7 @@ export async function addSnapshot(
     db.run(
       'INSERT INTO snapshots (screenshot_path, summary, session_id) VALUES (?, ?, ?)',
       [screenshotPath, summary, sessionId],
-      (err) => {
+      (err: Error | null) => {
         if (err) reject(err);
         else resolve();
       }
