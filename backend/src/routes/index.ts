@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
 import { summarizeScreenshotStructured, generateTimelineEntry } from '../services/gemini-structured';
-import { addSnapshot, getSessionSnapshots, getLastSessionSnapshot, getSessionTimeline, updateSessionTimeline } from '../services/db';
+import { addSnapshot, getSessionSnapshots, getLastSessionSnapshot, getSessionTimeline, addTimelineEntry } from '../services/db';
 import { startStreaming, stopStreaming, isStreamingActive } from '../services/streaming';
 
 const router = Router();
@@ -81,8 +81,7 @@ router.get('/screenshot', async (req, res) => {
           const currentTimeline = await getSessionTimeline(sessionId);
           const timestamp = new Date().toISOString();
           const newEntry = await generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp);
-          const updatedTimeline = currentTimeline ? `${currentTimeline}\n\n${newEntry}` : newEntry;
-          await updateSessionTimeline(sessionId, updatedTimeline);
+          await addTimelineEntry(sessionId, newEntry, summary.Caption, timestamp);
           
           res.json({ 
             screenshot: filePath, 

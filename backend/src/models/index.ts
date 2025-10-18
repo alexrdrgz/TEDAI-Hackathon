@@ -14,3 +14,11 @@ export const TimelineEntrySchema = z.object({
 });
 
 export type TimelineEntry = z.infer<typeof TimelineEntrySchema>;
+
+export const TimelineEntryDataSchema = z.object({
+  text: z.string().describe('The timeline entry text'),
+  caption: z.string().describe('The caption/task from the screenshot'),
+  timestamp: z.string().describe('ISO timestamp when this entry was created'),
+});
+
+export type TimelineEntryData = z.infer<typeof TimelineEntryDataSchema>;

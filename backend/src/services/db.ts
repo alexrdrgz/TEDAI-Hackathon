@@ -30,10 +30,13 @@ export function initDatabase(): Promise<void> {
           if (err) reject(err);
           else {
             db.run(
-              `CREATE TABLE IF NOT EXISTS timelines (
-                session_id TEXT PRIMARY KEY,
-                content TEXT NOT NULL,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+              `CREATE TABLE IF NOT EXISTS timeline_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                text TEXT NOT NULL,
+                caption TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
               )`,
               (err: Error | null) => {
                 if (err) reject(err);
@@ -112,26 +115,67 @@ export async function getLastSessionSnapshot(
 
 export async function getSessionTimeline(sessionId: string): Promise<string | null> {
   return new Promise((resolve, reject) => {
-    db.get(
-      'SELECT content FROM timelines WHERE session_id = ?',
+    db.all(
+      'SELECT text, timestamp FROM timeline_entries WHERE session_id = ? ORDER BY created_at ASC',
       [sessionId],
-      (err: Error | null, row: any) => {
+      (err: Error | null, rows: any[]) => {
         if (err) reject(err);
-        else resolve(row ? row.content : null);
+        else if (!rows || rows.length === 0) resolve(null);
+        else {
+          const timeline = rows
+            .map((row) => {
+              const date = new Date(row.timestamp).toLocaleString();
+              return `${date}: ${row.text}`;
+            })
+            .join('\n\n');
+          resolve(timeline);
+        }
       }
     );
   });
 }
 
-export async function updateSessionTimeline(sessionId: string, content: string): Promise<void> {
+export async function addTimelineEntry(
+  sessionId: string,
+  text: string,
+  caption: string,
+  timestamp: string
+): Promise<void> {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT OR REPLACE INTO timelines (session_id, content, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
-      [sessionId, content],
+      'INSERT INTO timeline_entries (session_id, text, caption, timestamp) VALUES (?, ?, ?, ?)',
+      [sessionId, text, caption, timestamp],
       (err: Error | null) => {
         if (err) reject(err);
         else resolve();
       }
     );
+  });
+}
+
+export async function getTimelineEntriesForPeriod(
+  sessionId: string,
+  startTime?: Date,
+  endTime?: Date
+): Promise<Array<{ text: string; caption: string; timestamp: string }>> {
+  return new Promise((resolve, reject) => {
+    let query = 'SELECT text, caption, timestamp FROM timeline_entries WHERE session_id = ?';
+    const params: any[] = [sessionId];
+
+    if (startTime) {
+      query += ' AND timestamp >= ?';
+      params.push(startTime.toISOString());
+    }
+    if (endTime) {
+      query += ' AND timestamp <= ?';
+      params.push(endTime.toISOString());
+    }
+
+    query += ' ORDER BY created_at ASC';
+
+    db.all(query, params, (err: Error | null, rows: any[]) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
   });
 }
