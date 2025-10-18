@@ -3,6 +3,8 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { summarizeScreenshot, generateEmailFromContext, generateCalendarFromContext } from '../services/gemini';
 import { getRandomEmailScenario, getRandomCalendarScenario, getEmailScenarioById, getCalendarScenarioById } from '../data/mockScenarios';
+import monitorRouter from './monitor';
+import contextRouter from './context';
 
 const router = Router();
 
@@ -32,40 +34,8 @@ router.get('/python', (req, res) => {
   });
 });
 
-router.get('/screenshot', async (req, res) => {
-  try {
-    const width = req.query.width ? parseInt(req.query.width as string) : null;
-    const height = req.query.height ? parseInt(req.query.height as string) : null;
-
-    const args = [];
-    if (width) args.push(width.toString());
-    if (height) args.push(height.toString());
-
-    const pythonProcess = spawn('python3', [path.join(__dirname, '../../screen_monitor/get_screenshot.py'), ...args]);
-    let screenshotPath = '';
-    let error = '';
-
-    pythonProcess.stdout.on('data', (data) => {
-      screenshotPath += data.toString();
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-      error += data.toString();
-    });
-
-    pythonProcess.on('close', async (code) => {
-      if (code === 0) {
-        const filePath = screenshotPath.trim();
-        const summary = await summarizeScreenshot(filePath);
-        res.json({ screenshot: filePath, summary });
-      } else {
-        res.status(500).json({ error: error || 'Failed to capture screenshot' });
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+router.use('/monitor', monitorRouter);
+router.use('/context', contextRouter);
 
 router.post('/generate-email', async (req, res) => {
   try {

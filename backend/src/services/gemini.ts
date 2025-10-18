@@ -3,11 +3,14 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+import dotenv from 'dotenv';
 import { EmailScenario, CalendarScenario } from '../data/mockScenarios';
+
+dotenv.config();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY as string);
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 export async function summarizeScreenshot(screenshotPath: string): Promise<string> {
   // Read the screenshot file
@@ -172,3 +175,31 @@ Make sure the event details are professional, contextual, and appropriate for th
   }
 }
 
+export async function generateSessionTimeline(
+  snapshots: Array<{ screenshot_path: string; summary: string; created_at: string }>
+): Promise<string> {
+  const context = snapshots
+    .map((snap) => {
+      const utcDate = new Date(snap.created_at);
+      const localTime = utcDate.toLocaleString();
+      return `[${localTime}]\n${snap.summary}`;
+    })
+    .join('\n\n---\n\n');
+
+  const response = await axios.post(
+    `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+    {
+      contents: [
+        {
+          parts: [
+            {
+              text: `Based on the following sequence of screenshot summaries from a user session, create a detailed timeline of what happened. Format it as a clear chronological narrative that shows the progression of activities.\n\nContext:\n${context}`
+            }
+          ]
+        }
+      ]
+    }
+  );
+
+  return response.data.candidates[0].content.parts[0].text;
+}
