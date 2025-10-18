@@ -23,6 +23,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Add hello route for testing
+app.get('/api/hello', (req, res) => {
+  res.json({ message: 'Hello World' });
+});
+
 // Mount routes
 app.use('/api/chat', chatRoutes);
 app.use('/api/monitor', monitoringRoutes);

@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import * as fs from 'fs';
 
-const dbDir = path.join(__dirname, '../../../data');
+const dbDir = path.join(__dirname, '../../../../data');
 const DB_PATH = path.join(dbDir, 'monitoring.db');
 
 // Create data directory if it doesn't exist

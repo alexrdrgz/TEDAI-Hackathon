@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as fs from 'fs';
-import { ScreenshotSummary, ScreenshotSummarySchema, TimelineEntry, TimelineEntrySchema } from '../models/index';
+import { ScreenshotSummary, ScreenshotSummarySchema, TimelineEntry, TimelineEntrySchema } from '../../shared/types';
 import dotenv from 'dotenv';
 
 dotenv.config();

@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { summarizeScreenshotStructured, generateTimelineEntry } from './gemini-structured';
-import { addSnapshot, getLastSessionSnapshot, getSessionTimeline, updateSessionTimeline } from './db';
+import { addSnapshot, getLastSessionSnapshot, getSessionTimeline, updateSessionTimeline } from '../models/database';
 
 let isStreaming = false;
 let streamingTimeout: NodeJS.Timeout | null = null;
