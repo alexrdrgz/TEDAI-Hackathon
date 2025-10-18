@@ -156,3 +156,29 @@ globalThis.addTestEmailTask = async function() {
   await handleAddTask(testTask);
   console.log('Test email task added');
 };
+
+globalThis.addTestCalendarTask = async function() {
+  // Create a test calendar event for tomorrow at 2 PM, 1 hour duration
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(14, 0, 0, 0); // 2 PM
+  
+  const endTime = new Date(tomorrow);
+  endTime.setHours(15, 0, 0, 0); // 3 PM
+  
+  const testTask = {
+    type: 'calendar',
+    data: {
+      title: 'TEDAI Test Meeting',
+      description: 'This is a test calendar event created by the TEDAI AI Agent to demonstrate calendar functionality.',
+      startTime: tomorrow.toISOString(),
+      endTime: endTime.toISOString(),
+      attendees: ['colleague@example.com', 'manager@example.com'],
+      location: 'Conference Room A',
+      reminder: 15 // 15 minutes before
+    }
+  };
+  
+  await handleAddTask(testTask);
+  console.log('Test calendar task added');
+};

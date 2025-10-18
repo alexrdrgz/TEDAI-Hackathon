@@ -25,9 +25,11 @@ export interface EmailTask {
 export interface CalendarTask {
   title: string;
   description?: string;
-  startTime: Date;
-  endTime: Date;
+  startTime: string; // ISO 8601 format
+  endTime: string; // ISO 8601 format
   attendees?: string[];
+  location?: string;
+  reminder?: number; // minutes before event
 }
 
 export interface ReminderTask {
