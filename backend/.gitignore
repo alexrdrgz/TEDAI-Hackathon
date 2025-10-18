@@ -92,6 +92,9 @@ public
 tmp/
 temp/
 
+# Screenshots
+screenshots/
+
 # Logs
 logs
 *.log
