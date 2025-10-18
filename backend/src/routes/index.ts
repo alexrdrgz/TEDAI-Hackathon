@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
 import { summarizeScreenshot } from '../services/gemini';
+import { addSnapshot } from '../services/db';
+import { startStreaming, stopStreaming, isStreamingActive } from '../services/streaming';
 
 const router = Router();
 
@@ -56,6 +58,8 @@ router.get('/screenshot', async (req, res) => {
       if (code === 0) {
         const filePath = screenshotPath.trim();
         const summary = await summarizeScreenshot(filePath);
+        const sessionId = req.query.sessionId as string || 'default';
+        await addSnapshot(filePath, summary, sessionId);
         res.json({ screenshot: filePath, summary });
       } else {
         res.status(500).json({ error: error || 'Failed to capture screenshot' });
@@ -63,6 +67,18 @@ router.get('/screenshot', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/streaming', (req, res) => {
+  const on = req.query.on === 'true';
+  
+  if (on) {
+    startStreaming();
+    res.json({ status: 'streaming started', isActive: isStreamingActive() });
+  } else {
+    stopStreaming();
+    res.json({ status: 'streaming stopped', isActive: isStreamingActive() });
   }
 });
 
