@@ -112,6 +112,13 @@ class TaskQueueManager {
         const endTime = new Date(tomorrow);
         endTime.setHours(15, 0, 0, 0); // 3 PM
         
+        if (!(tomorrow instanceof Date && !isNaN(+tomorrow)) ||
+            !(endTime instanceof Date && !isNaN(+endTime)) ||
+            endTime <= tomorrow) {
+            console.error('Invalid calendar test times');
+            return;
+        }
+        
         const testTask = {
             type: 'calendar',
             data: {
