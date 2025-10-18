@@ -48,3 +48,10 @@ The agent can perform common computer tasks, such as:
 - **AI/ML:** TensorFlow, PyTorch, Hugging Face Transformers (NLP, screen analysis, task automation)
 - **Screen Monitoring:** OCR libraries, screenshot APIs, accessibility APIs (to capture and interpret screen content)
 - **Memory/Context:** Vector databases, persistent storage (to maintain conversation history and context)
+
+### The primary goals for this live chat interface development are:
+
+- **Real-time Communication:** Establish seamless, low-latency communication between the React frontend and the Node.js backend.
+- **Intuitive User Experience:** Design a clean and easy-to-use interface for sending messages and viewing agent responses.
+- **Demonstrate Core Functionality:** Clearly showcase the AI Agent's ability to provide suggestions and execute tasks.
+- **Robustness:** Ensure stable communication and error handling.
