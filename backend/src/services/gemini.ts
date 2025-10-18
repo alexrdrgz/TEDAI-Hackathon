@@ -3,7 +3,7 @@ import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyB_8hUBrt2quD5UoGYPY73ScWQknwZkVIA';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 export async function summarizeScreenshot(screenshotPath: string): Promise<string> {
