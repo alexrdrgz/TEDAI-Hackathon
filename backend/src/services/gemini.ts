@@ -18,8 +18,8 @@ export const getChatResponse = async (
   conversationHistory: ChatMessage[] = []
 ): Promise<string> => {
   try {
-    // Use gemini-pro model
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    // Use gemini-2.5-flash-preview (latest available model)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
 
     // Format conversation history for Gemini
     // Gemini expects alternating user/model messages
