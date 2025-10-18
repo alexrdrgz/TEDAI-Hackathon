@@ -6,7 +6,7 @@ import {
   getConversationHistory,
   saveContext,
   getContext
-} from '../models';
+} from '../models/database';
 import { getChatResponseWithContext } from '../services/gemini';
 
 const router = Router();

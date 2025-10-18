@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
-import routes from './routes';
-import './models/database'; // Initialize database
+import chatRoutes from './chat/routes';
+import monitoringRoutes from './monitoring/routes';
+import './chat/models/database'; // Initialize chat database
+import './monitoring/models/database'; // Initialize monitoring database
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,8 +23,12 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/api', routes);
+// Mount routes
+app.use('/api/chat', chatRoutes);
+app.use('/api/monitor', monitoringRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log('Chat endpoints: /api/chat/*');
+  console.log('Monitoring endpoints: /api/monitor/*');
 });

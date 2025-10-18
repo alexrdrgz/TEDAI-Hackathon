@@ -6,4 +6,7 @@ export {
   getConversationHistory,
   saveContext,
   getContext
-} from './database';
+} from '../chat/models/database';
+
+// Re-export shared types
+export * from '../shared/types';
