@@ -1,7 +1,8 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { summarizeScreenshotStructured, generateTimelineEntry } from './gemini-structured';
-import { addSnapshot, getLastSessionSnapshot, getSessionTimeline, updateSessionTimeline } from './db';
+import { addSnapshot, getLastSessionSnapshot } from './snapshots';
+import { getSessionTimeline, addTimelineEntry } from './timeline';
 
 let isStreaming = false;
 let streamingTimeout: NodeJS.Timeout | null = null;
@@ -55,8 +56,7 @@ async function captureAndSaveScreenshot(): Promise<void> {
     const currentTimeline = await getSessionTimeline(sessionId);
     const timestamp = new Date().toISOString();
     const newEntry = await generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp);
-    const updatedTimeline = currentTimeline ? `${currentTimeline}\n\n${newEntry}` : newEntry;
-    await updateSessionTimeline(sessionId, updatedTimeline);
+    await addTimelineEntry(sessionId, newEntry, summary.Caption, timestamp);
 
     const elapsedTime = Date.now() - startTime;
     const remainingTime = Math.max(0, 15000 - elapsedTime);
