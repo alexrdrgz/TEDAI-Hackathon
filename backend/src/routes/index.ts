@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshot } from '../services/gemini';
+import { summarizeScreenshot, generateEmailFromContext, generateCalendarFromContext } from '../services/gemini';
+import { getRandomEmailScenario, getRandomCalendarScenario, getEmailScenarioById, getCalendarScenarioById } from '../data/mockScenarios';
 
 const router = Router();
 
@@ -63,6 +64,50 @@ router.get('/screenshot', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/generate-email', async (req, res) => {
+  try {
+    const { scenarioId } = req.body;
+    
+    let scenario;
+    if (scenarioId) {
+      scenario = getEmailScenarioById(scenarioId);
+      if (!scenario) {
+        return res.status(404).json({ error: 'Email scenario not found' });
+      }
+    } else {
+      scenario = getRandomEmailScenario();
+    }
+
+    const generatedTask = await generateEmailFromContext(scenario);
+    res.json(generatedTask);
+  } catch (error) {
+    console.error('Error generating email:', error);
+    res.status(500).json({ error: 'Failed to generate email' });
+  }
+});
+
+router.post('/generate-calendar', async (req, res) => {
+  try {
+    const { scenarioId } = req.body;
+    
+    let scenario;
+    if (scenarioId) {
+      scenario = getCalendarScenarioById(scenarioId);
+      if (!scenario) {
+        return res.status(404).json({ error: 'Calendar scenario not found' });
+      }
+    } else {
+      scenario = getRandomCalendarScenario();
+    }
+
+    const generatedTask = await generateCalendarFromContext(scenario);
+    res.json(generatedTask);
+  } catch (error) {
+    console.error('Error generating calendar event:', error);
+    res.status(500).json({ error: 'Failed to generate calendar event' });
   }
 });
 
