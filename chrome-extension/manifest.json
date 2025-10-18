@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "TEDAI Proactive AI Agent",
+  "version": "1.0.0",
+  "description": "An intelligent AI agent that monitors your screen and provides proactive suggestions",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TEDAI AI Agent"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["page.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
