@@ -68,7 +68,7 @@ export const addSnapshot = (
   sessionId: string
 ): void => {
   const stmt = db.prepare(
-    'INSERT INTO snapshots (screenshot_path, caption, full_description, changes, facts, session_id) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO snapshots (screenshot_path, caption, full_description, changes, facts, session_id) VALUES (?, ?, ?, ?, ?, ?)'
   );
   stmt.run(screenshotPath, caption, fullDescription, JSON.stringify(changes), JSON.stringify(facts), sessionId);
 };
