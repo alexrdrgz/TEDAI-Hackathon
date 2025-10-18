@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshot } from '../services/gemini';
-import { addSnapshot } from '../services/db';
+import { summarizeScreenshotStructured, generateTimelineEntry } from '../services/gemini-structured';
+import { addSnapshot, getSessionSnapshots, getLastSessionSnapshot, getSessionTimeline, updateSessionTimeline } from '../services/db';
 import { startStreaming, stopStreaming, isStreamingActive } from '../services/streaming';
 
 const router = Router();
@@ -56,11 +56,42 @@ router.get('/screenshot', async (req, res) => {
 
     pythonProcess.on('close', async (code) => {
       if (code === 0) {
-        const filePath = screenshotPath.trim();
-        const summary = await summarizeScreenshot(filePath);
-        const sessionId = req.query.sessionId as string || 'default';
-        await addSnapshot(filePath, summary, sessionId);
-        res.json({ screenshot: filePath, summary });
+        try {
+          const filePath = screenshotPath.trim();
+          const sessionId = req.query.sessionId as string || 'default';
+          
+          // Get previous snapshot for context
+          const previousSnapshot = await getLastSessionSnapshot(sessionId);
+          
+          // Summarize with context - only pass previous summary if it exists
+          const summary = await summarizeScreenshotStructured(
+            filePath,
+            previousSnapshot ? { Caption: previousSnapshot.caption, FullDescription: '', Changes: previousSnapshot.changes, Facts: [] } : undefined
+          );
+          
+          // If there's no previous snapshot, ensure Changes is empty array
+          if (!previousSnapshot) {
+            summary.Changes = [];
+          }
+          
+          // Store in database
+          await addSnapshot(filePath, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
+          
+          // Generate and append timeline entry
+          const currentTimeline = await getSessionTimeline(sessionId);
+          const timestamp = new Date().toISOString();
+          const newEntry = await generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp);
+          const updatedTimeline = currentTimeline ? `${currentTimeline}\n\n${newEntry}` : newEntry;
+          await updateSessionTimeline(sessionId, updatedTimeline);
+          
+          res.json({ 
+            screenshot: filePath, 
+            summary,
+            timelineUpdated: true
+          });
+        } catch (err) {
+          res.status(500).json({ error: 'Failed to process screenshot', details: (err as Error).message });
+        }
       } else {
         res.status(500).json({ error: error || 'Failed to capture screenshot' });
       }
@@ -79,6 +110,21 @@ router.get('/streaming', (req, res) => {
   } else {
     stopStreaming();
     res.json({ status: 'streaming stopped', isActive: isStreamingActive() });
+  }
+});
+
+router.get('/session-context', async (req, res) => {
+  try {
+    const sessionId = (req.query.sessionId as string) || '0';
+    const timeline = await getSessionTimeline(sessionId);
+    
+    if (!timeline) {
+      return res.json({ message: 'No timeline for this session', timeline: '' });
+    }
+    
+    res.json({ sessionId, timeline });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error', details: (err as Error).message });
   }
 });
 

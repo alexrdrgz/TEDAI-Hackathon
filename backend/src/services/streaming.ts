@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshot } from './gemini';
-import { addSnapshot } from './db';
+import { summarizeScreenshotStructured, generateTimelineEntry } from './gemini-structured';
+import { addSnapshot, getLastSessionSnapshot, getSessionTimeline, updateSessionTimeline } from './db';
 
 let isStreaming = false;
 let streamingTimeout: NodeJS.Timeout | null = null;
@@ -33,8 +33,30 @@ async function captureAndSaveScreenshot(): Promise<void> {
     });
 
     const filePath = screenshotPath.trim();
-    const summary = await summarizeScreenshot(filePath);
-    await addSnapshot(filePath, summary, '0');
+    const sessionId = '0';
+    
+    // Get previous snapshot for context
+    const previousSnapshot = await getLastSessionSnapshot(sessionId);
+    
+    // Summarize with context
+    const summary = await summarizeScreenshotStructured(
+      filePath,
+      previousSnapshot ? { Caption: previousSnapshot.caption, FullDescription: '', Changes: previousSnapshot.changes, Facts: [] } : undefined
+    );
+    
+    // If there's no previous snapshot, ensure Changes is empty array
+    if (!previousSnapshot) {
+      summary.Changes = [];
+    }
+    
+    await addSnapshot(filePath, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
+
+    // Generate and append timeline entry
+    const currentTimeline = await getSessionTimeline(sessionId);
+    const timestamp = new Date().toISOString();
+    const newEntry = await generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp);
+    const updatedTimeline = currentTimeline ? `${currentTimeline}\n\n${newEntry}` : newEntry;
+    await updateSessionTimeline(sessionId, updatedTimeline);
 
     const elapsedTime = Date.now() - startTime;
     const remainingTime = Math.max(0, 15000 - elapsedTime);
