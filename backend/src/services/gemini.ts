@@ -1,1 +1,1 @@
-# Gemini Service Template
+// Gemini Service Template
