@@ -58,6 +58,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
       return true; // Keep message channel open for async response
+    } else if (message.type === 'ADD_TEST_CALENDAR_TASK') {
+      globalThis.addTestCalendarTask().then(() => {
+        sendResponse({ success: true });
+      }).catch(error => {
+        console.error('Error handling ADD_TEST_CALENDAR_TASK:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+      return true; // Keep message channel open for async response
     }
   } catch (error) {
     console.error('Error in message listener:', error);

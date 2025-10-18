@@ -104,42 +104,14 @@ class TaskQueueManager {
     }
 
     async addTestCalendarTask() {
-        // Create a test calendar event for tomorrow at 2 PM, 1 hour duration
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(14, 0, 0, 0); // 2 PM
+        console.log('Adding test calendar task via background script...');
         
-        const endTime = new Date(tomorrow);
-        endTime.setHours(15, 0, 0, 0); // 3 PM
-        
-        if (!(tomorrow instanceof Date && !isNaN(+tomorrow)) ||
-            !(endTime instanceof Date && !isNaN(+endTime)) ||
-            endTime <= tomorrow) {
-            console.error('Invalid calendar test times');
-            return;
-        }
-        
-        const testTask = {
-            type: 'calendar',
-            data: {
-                title: 'TEDAI Test Meeting',
-                description: 'This is a test calendar event created by the TEDAI AI Agent to demonstrate calendar functionality.',
-                startTime: tomorrow.toISOString(),
-                endTime: endTime.toISOString(),
-                attendees: ['colleague@example.com', 'manager@example.com'],
-                location: 'Conference Room A',
-                reminder: 15 // 15 minutes before
-            }
-        };
-
-        console.log('Adding test calendar task:', testTask);
-
         try {
+            // Call the background script's test calendar function
             const response = await this.sendMessageToBackground({ 
-                type: 'ADD_TASK', 
-                task: testTask 
+                type: 'ADD_TEST_CALENDAR_TASK'
             });
-            console.log('Add calendar task response:', response);
+            console.log('Add test calendar task response:', response);
             
             await this.loadTasks();
             this.render();
