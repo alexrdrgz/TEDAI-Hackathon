@@ -1,5 +1,5 @@
 function openPage() {
-    chrome.tabs.create({ url: chrome.runtime.getURL('page.html') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('dist/page.html') });
 }
 
 // Add event listener when DOM is loaded

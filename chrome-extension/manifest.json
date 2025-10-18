@@ -17,7 +17,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["page.html"],
+      "resources": ["dist/page.html", "dist/bundle.js"],
       "matches": ["<all_urls>"]
     }
   ]

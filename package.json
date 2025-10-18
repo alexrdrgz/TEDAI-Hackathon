@@ -1,1 +1,10 @@
-# Root Package Configuration
+{
+  "name": "tedai-hackathon",
+  "version": "1.0.0",
+  "description": "TEDAI Proactive AI Agent",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "chrome-extension"
+  ]
+}
