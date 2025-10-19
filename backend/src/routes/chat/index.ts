@@ -41,7 +41,7 @@ router.post('/session', async (req, res) => {
       session_id: sessionId 
     });
   } catch (error: any) {
-    console.error('Error creating session:', error);
+    console.error('[CreateSession] Error:', error.message);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to create session' 
@@ -61,7 +61,7 @@ router.get('/sessions', async (req, res) => {
       sessions 
     });
   } catch (error: any) {
-    console.error('Error fetching sessions:', error);
+    console.error('[GetSessions] Error:', error.message);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch sessions' 
@@ -93,7 +93,7 @@ router.get('/session/:sessionId/messages', async (req, res) => {
       messages 
     });
   } catch (error: any) {
-    console.error('Error fetching messages:', error);
+    console.error('[GetMessages] Error:', error.message);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch messages' 
@@ -178,7 +178,7 @@ router.post('/session/:sessionId/message', async (req, res) => {
       assistant_message_id: assistantMessageId
     });
   } catch (error: any) {
-    console.error('Error processing message:', error);
+    console.error('[ChatMessage] Error:', error.message);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to process message' 
@@ -271,7 +271,7 @@ router.get('/session/:sessionId/poll', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('Error in polling:', error);
+    console.error('[Polling] Error:', error.message);
     res.status(500).json({ 
       success: false, 
       error: 'Polling failed' 
