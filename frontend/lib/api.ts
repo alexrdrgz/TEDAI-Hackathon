@@ -47,7 +47,7 @@ export async function getMessages(sessionId: string, limit: number = 50): Promis
   if (data.success) {
     return data.messages;
   }
-  throw new Error('Failed to fetch messages');
+  throw new Error(data.error || 'Failed to fetch messages');
 }
 
 /**

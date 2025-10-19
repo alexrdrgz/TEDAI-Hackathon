@@ -202,9 +202,16 @@ Please help me make any changes I need. When I'm satisfied with the edits, I'll 
           })
         })
       } catch (err: any) {
+        // If session not found, create a new one
+        if (err.message && err.message.includes('Session not found')) {
+          console.log('Session not found, creating new session...')
+          await createNewSession()
+          return
+        }
+        
         toast({
           title: "Error",
-          description: "Failed to load messages",
+          description: err.message || "Failed to load messages",
           variant: "destructive",
         })
         console.error(err)
