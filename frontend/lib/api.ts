@@ -225,3 +225,32 @@ export async function getAllSnapshots(): Promise<Snapshot[]> {
   }
   throw new Error('Failed to fetch all snapshots');
 }
+
+export interface TimeCategory {
+  category: string;
+  description: string;
+  percentage: number;
+  duration: string;
+}
+
+export interface TimeSummary {
+  categories: TimeCategory[];
+  totalActivities: number;
+  summary: string;
+}
+
+/**
+ * Get AI-powered time summary for a session
+ */
+export async function getTimeSummary(sessionId: string): Promise<TimeSummary> {
+  console.log('[API] Fetching time summary for session:', sessionId)
+  console.log('[API] URL:', `${API_BASE_URL}/monitor/time-summary/${sessionId}`)
+  const response = await fetch(`${API_BASE_URL}/monitor/time-summary/${sessionId}`);
+  console.log('[API] Response status:', response.status)
+  const data = await response.json();
+  console.log('[API] Response data:', data)
+  if (data.success) {
+    return data.summary;
+  }
+  throw new Error('Failed to fetch time summary');
+}

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask, analyzeMessagingForActionItems } from '../../services/gemini';
+import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask, analyzeMessagingForActionItems, generateTimeSummary } from '../../services/gemini';
 import { addSnapshot, getLastSessionSnapshot, getSessionSnapshots, getAllSnapshots } from '../../services/snapshots';
 import { getSessionTimeline, addTimelineEntry } from '../../services/timeline';
 import { startStreaming, stopStreaming, isStreamingActive } from '../../services/streaming';
@@ -185,6 +185,20 @@ router.get('/screenshot/:filename', (req, res) => {
   } catch (error) {
     console.error('Error serving screenshot:', error);
     res.status(500).json({ error: 'Failed to serve screenshot' });
+  }
+});
+
+router.get('/time-summary/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    console.log(`[TimeSummary API] Received request for session: ${sessionId}`);
+    
+    const summary = await generateTimeSummary(sessionId);
+    console.log(`[TimeSummary API] Generated summary:`, JSON.stringify(summary, null, 2));
+    res.json({ success: true, summary });
+  } catch (error) {
+    console.error('[TimeSummary API] Error generating time summary:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate time summary' });
   }
 });
 
