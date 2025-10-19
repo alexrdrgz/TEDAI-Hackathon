@@ -80,6 +80,8 @@ config/secrets.js
 config/keys.js
 secrets/
 keys/
+*-*.json  # Google Cloud service account keys
+gen-lang-client-*.json
 
 # Extension specific
 *.crx

@@ -19,6 +19,8 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  audioBuffer?: Buffer;
+  audioMimeType?: string;
 }
 
 interface SessionContext {
@@ -44,6 +46,10 @@ interface Part {
   functionResponse?: {
     name: string;
     response: string | Record<string, any>;
+  };
+  inlineData?: {
+    mimeType: string;
+    data: string;
   };
 }
 
@@ -93,8 +99,46 @@ async function getSessionContext(sessionId: string): Promise<SessionContext> {
   });
 }
 
-async function buildSystemPrompt(context: SessionContext): Promise<string> {
+async function buildSystemPrompt(context: SessionContext, isVoiceMode: boolean = false): Promise<string> {
   const sessionTimeline = await getSessionTimeline('0');
+  
+  if (isVoiceMode) {
+    let systemPrompt = `You are a helpful AI assistant in voice mode. The user is speaking to you, and you will respond with audio.  Do not say that you can't work with audio.
+
+Keep your responses:
+- SHORT and conversational (2-3 sentences max)
+- Natural for spoken conversation
+- NO markdown formatting, bullet points, or special characters
+- Direct and to the point
+
+You have access to the user's recent computer activity and can help with tasks.
+
+Full history of the session:
+${sessionTimeline}
+`;
+    
+    if (context.snapshots.length > 0) {
+      systemPrompt += `\n\nRecent Screen Activity:\n`;
+      context.snapshots.reverse().forEach((snap, idx) => {
+        const time = formatToLocalTime(snap.created_at);
+        systemPrompt += `\n[${time}] ${snap.caption}`;
+        if (snap.facts) {
+          systemPrompt += `\nKey facts: ${snap.facts}`;
+        }
+      });
+    }
+
+    if (context.timeline.length > 0) {
+      systemPrompt += `\n\nSession Timeline:\n`;
+      context.timeline.reverse().forEach((entry) => {
+        const time = formatToLocalTime(entry.timestamp);
+        systemPrompt += `\n[${time}] ${entry.caption}: ${entry.text}`;
+      });
+    }
+
+    return systemPrompt;
+  }
+  
   let systemPrompt = `You are a helpful AI assistant with access to the user's recent computer activity. You can provide smart suggestions and help with tasks based on what the user is working on.
 
 Your responses should be:
@@ -136,7 +180,8 @@ ${sessionTimeline}
 
 export async function generateChatResponse(
   messages: ChatMessage[],
-  sessionId?: string
+  sessionId?: string,
+  isVoiceMode: boolean = false
 ): Promise<string> {
   const requestId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const maxIterations = 5;
@@ -152,11 +197,30 @@ export async function generateChatResponse(
       }
     }
 
-    const systemPrompt = await buildSystemPrompt(context);
-    let contents: Content[] = messages.map((msg) => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
+    const systemPrompt = await buildSystemPrompt(context, isVoiceMode);
+    let contents: Content[] = messages.map((msg) => {
+      const parts: Part[] = [];
+      
+      // Add audio if present
+      if (msg.audioBuffer && msg.audioMimeType) {
+        parts.push({
+          inlineData: {
+            mimeType: msg.audioMimeType,
+            data: msg.audioBuffer.toString('base64')
+          }
+        });
+      }
+      
+      // Add text content if present
+      if (msg.content) {
+        parts.push({ text: msg.content });
+      }
+      
+      return {
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts
+      };
+    });
 
     const toolDefinitions = getToolDefinitions();
 
