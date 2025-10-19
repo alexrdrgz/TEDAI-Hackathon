@@ -39,6 +39,14 @@ class TaskQueueManager {
             const result = await chrome.storage.local.get(['screenshotMonitoringEnabled']);
             this.screenshotMonitoringEnabled = result.screenshotMonitoringEnabled || false;
             this.updateToggleUI();
+            
+            // Log initial state
+            if (this.screenshotMonitoringEnabled) {
+                console.log('🟢 Screenshot streaming state loaded: ACTIVE (was previously enabled)');
+            } else {
+                console.log('🔴 Screenshot streaming state loaded: INACTIVE (was previously disabled)');
+            }
+            
             console.log('Loaded toggle state:', this.screenshotMonitoringEnabled);
         } catch (error) {
             console.error('Failed to load toggle state:', error);
@@ -52,7 +60,8 @@ class TaskQueueManager {
         const screenshotToggle = document.getElementById('screenshotToggle');
         if (screenshotToggle) {
             screenshotToggle.addEventListener('click', () => {
-                console.log('Screenshot toggle clicked!');
+                const currentState = this.screenshotMonitoringEnabled;
+                console.log(`🔄 Screenshot toggle clicked! Current state: ${currentState ? 'ON' : 'OFF'}`);
                 this.toggleScreenshotMonitoring();
             });
         } else {
@@ -397,20 +406,36 @@ class TaskQueueManager {
         this.setToggleDisabled(true);
         
         try {
+            console.log(`🌐 Making API request to: http://localhost:3000/api/monitor/streaming?on=${newState}`);
             const response = await fetch(`http://localhost:3000/api/monitor/streaming?on=${newState}`);
+            console.log('📡 API Response status:', response.status, response.statusText);
             const data = await response.json();
+            console.log('📦 API Response data:', data);
             
             if (response.ok) {
                 this.screenshotMonitoringEnabled = newState;
                 await this.saveToggleState();
                 this.updateToggleUI();
+                
+                // Log streaming state changes
+                if (newState) {
+                    console.log('🟢 Screenshot streaming STARTED - Monitoring is now active');
+                } else {
+                    console.log('🔴 Screenshot streaming STOPPED - Monitoring is now inactive');
+                }
+                
                 console.log('Screenshot monitoring toggled successfully:', data);
             } else {
                 console.error('Failed to toggle screenshot monitoring:', data);
                 this.showToggleError();
             }
         } catch (error) {
-            console.error('Error toggling screenshot monitoring:', error);
+            console.error('❌ Error toggling screenshot monitoring:', error);
+            console.error('❌ Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
             this.showToggleError();
         } finally {
             this.setToggleDisabled(false);
@@ -445,27 +470,52 @@ class TaskQueueManager {
 
     setToggleDisabled(disabled) {
         const toggleSwitch = document.getElementById('screenshotToggle');
+        const toggleStatus = document.getElementById('toggleStatus');
+        
         if (toggleSwitch) {
             if (disabled) {
                 toggleSwitch.classList.add('disabled');
+                // Add subtle pulsing animation during loading
+                toggleSwitch.style.animation = 'pulse 1.5s ease-in-out infinite';
             } else {
                 toggleSwitch.classList.remove('disabled');
+                toggleSwitch.style.animation = '';
             }
+        }
+        
+        if (toggleStatus && disabled) {
+            toggleStatus.textContent = '...';
+            toggleStatus.style.opacity = '0.5';
         }
     }
 
     showToggleError() {
         const toggleStatus = document.getElementById('toggleStatus');
+        const toggleSwitch = document.getElementById('screenshotToggle');
+        
         if (toggleStatus) {
             const originalText = toggleStatus.textContent;
-            toggleStatus.textContent = 'ERROR';
+            toggleStatus.textContent = 'ERR';
+            toggleStatus.style.opacity = '0.8';
             toggleStatus.style.color = '#ff6b6b';
-            
-            setTimeout(() => {
-                toggleStatus.textContent = originalText;
-                toggleStatus.style.color = '';
-            }, 2000);
         }
+        
+        if (toggleSwitch) {
+            toggleSwitch.style.borderColor = '#ff6b6b';
+            toggleSwitch.style.boxShadow = '0 0 8px rgba(255, 107, 107, 0.3)';
+        }
+        
+        setTimeout(() => {
+            if (toggleStatus) {
+                toggleStatus.textContent = originalText;
+                toggleStatus.style.opacity = '';
+                toggleStatus.style.color = '';
+            }
+            if (toggleSwitch) {
+                toggleSwitch.style.borderColor = '';
+                toggleSwitch.style.boxShadow = '';
+            }
+        }, 2000);
     }
 
     render() {
