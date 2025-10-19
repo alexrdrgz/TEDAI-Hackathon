@@ -191,7 +191,6 @@ export function useVoiceMode({ onTranscription, onError }: UseVoiceModeProps = {
         audioElementRef.current = audio;
 
         const url = URL.createObjectURL(audioBlob);
-        audio.src = url;
 
         setState('speaking');
 
@@ -210,12 +209,20 @@ export function useVoiceMode({ onTranscription, onError }: UseVoiceModeProps = {
           reject(new Error('Audio playback error'));
         };
 
-        audio.play().catch(err => {
-          console.error('Error playing audio:', err);
-          setState('error');
-          setError('Failed to play audio');
-          reject(err);
-        });
+        // Wait for audio to be loaded before playing
+        audio.oncanplaythrough = () => {
+          audio.play().catch(err => {
+            console.error('Error playing audio:', err);
+            URL.revokeObjectURL(url);
+            audioElementRef.current = null;
+            setState('error');
+            setError('Failed to play audio');
+            reject(err);
+          });
+        };
+
+        audio.src = url;
+        audio.load();
       } catch (err: any) {
         console.error('Error in playAudio:', err);
         setState('error');

@@ -7,6 +7,7 @@ import os
 import json
 import pyttsx3
 import subprocess
+import time
 
 def text_to_speech(text, output_file, rate=150, volume=1.0, voice_index=0):
     """
@@ -38,6 +39,21 @@ def text_to_speech(text, output_file, rate=150, volume=1.0, voice_index=0):
         engine.save_to_file(text, temp_file)
         engine.runAndWait()
         
+        # Wait for temp file to be created (pyttsx3 writes async)
+        max_wait = 5  # seconds
+        wait_interval = 0.1
+        elapsed = 0
+        while not os.path.exists(temp_file) and elapsed < max_wait:
+            time.sleep(wait_interval)
+            elapsed += wait_interval
+        
+        # Verify temp file was created
+        if not os.path.exists(temp_file):
+            return {
+                "success": False,
+                "error": "pyttsx3 failed to create temp audio file"
+            }
+        
         # Convert AIFF to proper WAV format using ffmpeg (if available)
         try:
             # Try to convert with ffmpeg
@@ -55,6 +71,13 @@ def text_to_speech(text, output_file, rate=150, volume=1.0, voice_index=0):
             # Browsers might not play it, but at least we tried
             if os.path.exists(temp_file):
                 os.rename(temp_file, output_file)
+        
+        # Verify output file exists and has content
+        if not os.path.exists(output_file) or os.path.getsize(output_file) == 0:
+            return {
+                "success": False,
+                "error": "Failed to create audio file"
+            }
         
         return {
             "success": True,
