@@ -6,7 +6,7 @@ import { initDatabase } from './services/db';
 import { initializeTools } from './services/tools';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // CORS Configuration - production-ready with allowlist
@@ -76,10 +76,12 @@ app.use('/api', routes);
     server.on('error', (err: any) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`❌ Port ${PORT} is already in use. Please stop the process using that port.`);
+        console.error(`💡 Suggestion: Change PORT in your .env file to 3001, 3002, 4000, or 8000`);
+        process.exit(1);
       } else {
         console.error('❌ Failed to start server:', err);
+        throw err;
       }
-      throw err;
     });
   } catch (err) {
     console.error('Failed to initialize database:', err);
