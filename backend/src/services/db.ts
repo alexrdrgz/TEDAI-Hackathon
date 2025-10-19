@@ -40,12 +40,83 @@ export function initDatabase(): Promise<void> {
               )`,
               (err: Error | null) => {
                 if (err) reject(err);
-                else resolve();
+                else {
+                  db.run(
+                    `CREATE TABLE IF NOT EXISTS tasks (
+                      id TEXT PRIMARY KEY,
+                      type TEXT NOT NULL,
+                      data TEXT NOT NULL,
+                      status TEXT DEFAULT 'pending',
+                      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                      handled_at DATETIME
+                    )`,
+                    (err: Error | null) => {
+                      if (err) reject(err);
+                      else {
+                        // Add handled_at column if it doesn't exist
+                        db.run(
+                          `ALTER TABLE tasks ADD COLUMN handled_at DATETIME`,
+                          (alterErr: Error | null) => {
+                            // Ignore error if column already exists
+                            resolve();
+                          }
+                        );
+                      }
+                    }
+                  );
+                }
               }
             );
           }
         }
       );
     });
+  });
+}
+
+export function createTask(id: string, type: string, data: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO tasks (id, type, data, status) VALUES (?, ?, ?, 'pending')`,
+      [id, type, JSON.stringify(data)],
+      (err: Error | null) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+export function getPendingTasks(): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT * FROM tasks WHERE status = 'pending' ORDER BY created_at ASC`,
+      (err: Error | null, rows: any[]) => {
+        if (err) reject(err);
+        else {
+          const tasks = rows.map(row => ({
+            id: row.id,
+            type: row.type,
+            data: JSON.parse(row.data),
+            status: row.status,
+            createdAt: row.created_at
+          }));
+          resolve(tasks);
+        }
+      }
+    );
+  });
+}
+
+export function markTaskAsHandled(id: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE tasks SET status = 'handled', handled_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [id],
+      (err: Error | null) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
   });
 }
