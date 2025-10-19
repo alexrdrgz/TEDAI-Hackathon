@@ -35,12 +35,14 @@ function createStickyButton() {
     const style = document.createElement('style');
     style.id = 'tedai-sticky-styles';
     style.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
       .tedai-sticky-button {
         position: fixed;
         bottom: 20px;
         right: 20px;
         z-index: 2147483647;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         cursor: pointer;
       }
