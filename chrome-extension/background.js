@@ -40,6 +40,7 @@ async function updateBadgeCount() {
 // Listen for messages to add tasks to queue
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Background received message:', message);
+  console.log('Message type:', message.type);
   
   try {
     if (message.type === 'ADD_TASK') {
@@ -58,8 +59,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
       return true; // Keep message channel open for async response
+    } else if (message.type === 'ADD_TEST_EMAIL_TASK') {
+      console.log('Handling ADD_TEST_EMAIL_TASK message...');
+      globalThis.addTestEmailTask().then(() => {
+        console.log('Email task added successfully');
+        sendResponse({ success: true });
+      }).catch(error => {
+        console.error('Error handling ADD_TEST_EMAIL_TASK:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+      return true; // Keep message channel open for async response
     } else if (message.type === 'ADD_TEST_CALENDAR_TASK') {
+      console.log('Handling ADD_TEST_CALENDAR_TASK message...');
       globalThis.addTestCalendarTask().then(() => {
+        console.log('Calendar task added successfully');
         sendResponse({ success: true });
       }).catch(error => {
         console.error('Error handling ADD_TEST_CALENDAR_TASK:', error);
@@ -152,41 +165,92 @@ function generateTaskId() {
 // Manual trigger for testing (can be called from console)
 // Note: Service workers don't have window object, so we'll use chrome.runtime instead
 globalThis.addTestEmailTask = async function() {
-  const testTask = {
-    type: 'email',
-    data: {
-      to: 'test@example.com',
-      subject: 'Test Email from TEDAI',
-      body: 'This is a test email created by the TEDAI AI Agent.'
+  try {
+    console.log('=== addTestEmailTask function called ===');
+    console.log('Generating email task via Gemini API...');
+    
+    const response = await fetch('http://localhost:3001/api/generate-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({})
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
-  
-  await handleAddTask(testTask);
-  console.log('Test email task added');
+    
+    const generatedTask = await response.json();
+    console.log('Generated email task:', generatedTask);
+    
+    await handleAddTask(generatedTask);
+    console.log('Test email task added successfully');
+  } catch (error) {
+    console.error('Failed to generate test email task:', error);
+    
+    // Fallback to static test task if API fails
+    const fallbackTask = {
+      type: 'email',
+      data: {
+        to: 'test@example.com',
+        subject: 'Test Email from TEDAI (Fallback)',
+        body: 'This is a fallback test email created by the TEDAI AI Agent.'
+      }
+    };
+    
+    await handleAddTask(fallbackTask);
+    console.log('Fallback email task added');
+  }
 };
 
 globalThis.addTestCalendarTask = async function() {
-  // Create a test calendar event for tomorrow at 2 PM, 1 hour duration
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(14, 0, 0, 0); // 2 PM
-  
-  const endTime = new Date(tomorrow);
-  endTime.setHours(15, 0, 0, 0); // 3 PM
-  
-  const testTask = {
-    type: 'calendar',
-    data: {
-      title: 'TEDAI Test Meeting',
-      description: 'This is a test calendar event created by the TEDAI AI Agent to demonstrate calendar functionality.',
-      startTime: tomorrow.toISOString(),
-      endTime: endTime.toISOString(),
-      attendees: ['colleague@example.com', 'manager@example.com'],
-      location: 'Conference Room A',
-      reminder: 15 // 15 minutes before
+  try {
+    console.log('=== addTestCalendarTask function called ===');
+    console.log('Generating calendar task via Gemini API...');
+    
+    const response = await fetch('http://localhost:3001/api/generate-calendar', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({})
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
-  
-  await handleAddTask(testTask);
-  console.log('Test calendar task added');
+    
+    const generatedTask = await response.json();
+    console.log('Generated calendar task:', generatedTask);
+    
+    await handleAddTask(generatedTask);
+    console.log('Test calendar task added successfully');
+  } catch (error) {
+    console.error('Failed to generate test calendar task:', error);
+    
+    // Fallback to static test task if API fails
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(14, 0, 0, 0); // 2 PM
+    
+    const endTime = new Date(tomorrow);
+    endTime.setHours(15, 0, 0, 0); // 3 PM
+    
+    const fallbackTask = {
+      type: 'calendar',
+      data: {
+        title: 'TEDAI Test Meeting (Fallback)',
+        description: 'This is a fallback test calendar event created by the TEDAI AI Agent to demonstrate calendar functionality.',
+        startTime: tomorrow.toISOString(),
+        endTime: endTime.toISOString(),
+        attendees: ['colleague@example.com', 'manager@example.com'],
+        location: 'Conference Room A',
+        reminder: 15 // 15 minutes before
+      }
+    };
+    
+    await handleAddTask(fallbackTask);
+    console.log('Fallback calendar task added');
+  }
 };
