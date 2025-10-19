@@ -7,12 +7,14 @@ class TaskQueueManager {
         this.tasks = [];
         this.editingTaskId = null;
         this.snoozingTaskId = null;
+        this.screenshotToggle = null;
         this.init();
     }
 
     async init() {
         console.log('Initializing TaskQueueManager...');
         await this.loadTasks();
+        await this.initScreenshotToggle();
         this.setupEventListeners();
         this.render();
     }
@@ -32,8 +34,29 @@ class TaskQueueManager {
         }
     }
 
+    async initScreenshotToggle() {
+        console.log('Initializing screenshot toggle...');
+        this.screenshotToggle = new ScreenshotToggle();
+        console.log('ScreenshotToggle created:', !!this.screenshotToggle);
+        await this.screenshotToggle.init();
+        console.log('ScreenshotToggle initialized');
+    }
+
     setupEventListeners() {
         console.log('Setting up event listeners...');
+        
+        // Screenshot toggle
+        const screenshotToggle = document.getElementById('screenshotToggle');
+        console.log('Looking for screenshotToggle element:', !!screenshotToggle);
+        if (screenshotToggle) {
+            console.log('Adding click listener to toggle');
+            screenshotToggle.addEventListener('click', () => {
+                console.log('Toggle clicked in popup.js');
+                this.screenshotToggle?.toggle();
+            });
+        } else {
+            console.error('Screenshot toggle not found!');
+        }
         
         // Test buttons
         const testEmailButton = document.getElementById('addTestTask');

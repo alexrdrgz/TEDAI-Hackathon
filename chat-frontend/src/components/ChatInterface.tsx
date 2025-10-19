@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Message, sendMessage, getMessages, startPolling } from '../services/api';
+import { Message, sendMessage, getMessages, startPolling, sendVoiceMessage } from '../services/api';
+import { useVoiceMode } from '../hooks/useVoiceMode';
+import VoiceButton from './VoiceButton';
+import VoiceModeToggle from './VoiceModeToggle';
 import './ChatInterface.css';
+import './VoiceMode.css';
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -12,8 +16,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ sessionId }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stopPollingRef = useRef<(() => void) | null>(null);
+
+  // Voice mode hook
+  const voice = useVoiceMode({
+    onError: (err) => {
+      setError(err);
+    },
+  });
 
   // Scroll to bottom when messages change
   const scrollToBottom = () => {
@@ -99,6 +111,58 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ sessionId }) => {
     }
   };
 
+  const handleVoiceToggle = async (enabled: boolean) => {
+    if (enabled && !voice.hasPermission) {
+      const granted = await voice.requestMicrophonePermission();
+      if (!granted) {
+        return;
+      }
+    }
+    setIsVoiceMode(enabled);
+    setError(null);
+  };
+
+  const handleVoiceButtonClick = async () => {
+    if (voice.isRecording) {
+      // Stop recording and send
+      const audioBlob = await voice.stopRecording();
+      if (!audioBlob) {
+        setError('Failed to record audio');
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Send voice message
+        const result = await sendVoiceMessage(sessionId, audioBlob);
+        
+        // Convert base64 audio to blob (WAV format from local TTS)
+        const audioBytes = atob(result.audio);
+        const audioArray = new Uint8Array(audioBytes.length);
+        for (let i = 0; i < audioBytes.length; i++) {
+          audioArray[i] = audioBytes.charCodeAt(i);
+        }
+        const responseAudioBlob = new Blob([audioArray.buffer], { type: 'audio/wav' });
+
+        // Play AI response
+        await voice.playAudio(responseAudioBlob);
+      } catch (err: any) {
+        console.error('Voice message error:', err);
+        setError(err.message || 'Failed to process voice message');
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (voice.isSpeaking) {
+      // Interrupt AI speaking
+      voice.stopAudio();
+    } else {
+      // Start recording
+      await voice.startRecording();
+    }
+  };
+
   if (isInitialLoad) {
     return (
       <div className="chat-container">
@@ -113,8 +177,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ sessionId }) => {
   return (
     <div className="chat-container">
       <div className="chat-header">
-        <h2>AI Agent Assistant</h2>
-        <p className="session-id">Session: {sessionId.substring(0, 8)}...</p>
+        <div className="header-content">
+          <h2>AI Agent Assistant</h2>
+          <p className="session-id">Session: {sessionId.substring(0, 8)}...</p>
+        </div>
+        <VoiceModeToggle
+          isVoiceMode={isVoiceMode}
+          onToggle={handleVoiceToggle}
+          disabled={isLoading}
+        />
       </div>
 
       <div className="messages-container">
@@ -163,24 +234,40 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ sessionId }) => {
         </div>
       )}
 
-      <div className="input-container">
-        <textarea
-          className="message-input"
-          placeholder="Type your message..."
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyPress={handleKeyPress}
-          disabled={isLoading}
-          rows={1}
-        />
-        <button
-          className="send-button"
-          onClick={handleSend}
-          disabled={!inputValue.trim() || isLoading}
-        >
-          {isLoading ? '⏳' : '➤'}
-        </button>
-      </div>
+      {!isVoiceMode ? (
+        <div className="input-container">
+          <textarea
+            className="message-input"
+            placeholder="Type your message..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={isLoading}
+            rows={1}
+          />
+          <button
+            className="send-button"
+            onClick={handleSend}
+            disabled={!inputValue.trim() || isLoading}
+          >
+            {isLoading ? '⏳' : '➤'}
+          </button>
+        </div>
+      ) : (
+        <div className="voice-input-container">
+          <VoiceButton
+            state={voice.state}
+            onClick={handleVoiceButtonClick}
+            disabled={isLoading && voice.state === 'processing'}
+          />
+          {voice.isRecording && (
+            <div className="recording-indicator">
+              <div className="pulse-dot"></div>
+              <span>Listening...</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

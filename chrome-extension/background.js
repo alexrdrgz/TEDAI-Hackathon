@@ -149,7 +149,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // Poll for tasks from server
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3000/api';
 let pollingInterval = null;
 
 async function pollForTasks() {
@@ -187,6 +187,10 @@ async function pollForTasks() {
 // Start polling
 function startPolling() {
   if (pollingInterval) return;
+  
+  // Disable polling for now to avoid CORS issues
+  console.log('Polling disabled - tasks will be managed locally');
+  return;
   
   pollingInterval = setInterval(pollForTasks, 500);
   console.log('Started polling for tasks every 500ms');

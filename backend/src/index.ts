@@ -14,7 +14,12 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || 'http://localhost:3001,ht
 const allowedOrigins = ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
 
 app.use(cors({
-  origin: (origin, callback) => {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow Chrome extension origins
+    if (origin && origin.startsWith('chrome-extension://')) {
+      return callback(null, true);
+    }
+    
     // In development, allow requests with no origin (Postman, mobile apps, etc.)
     if (!origin && NODE_ENV === 'development') {
       return callback(null, true);
@@ -25,11 +30,11 @@ app.use(cors({
       callback(null, true);
     } else if (NODE_ENV === 'development') {
       // In development, be more permissive and allow with a warning
-      console.warn(`⚠️  CORS Warning: Origin '${origin}' not in ALLOWED_ORIGINS, but allowing in development mode`);
+      console.warn(`CORS Warning: Origin '${origin}' not in ALLOWED_ORIGINS, but allowing in development mode`);
       callback(null, true);
     } else {
       // In production, strictly enforce the allowlist
-      console.error(`❌ CORS Error: Origin '${origin}' is not allowed`);
+      console.error(`CORS Error: Origin '${origin}' is not allowed`);
       callback(new Error('Not allowed by CORS'));
     }
   },

@@ -116,7 +116,7 @@ async function monitorAndScreenshot(): Promise<void> {
       if (shouldTakeScreenshot) {
         // wait 1 second
         await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log('Taking screenshot...');
+        console.log(`Taking screenshot... (${percentDifferent}% different, ${Math.round(timeSinceLastScreenshot/1000)}s since last)`);
         const screenshotPath = await takeScreenshot();
         lastScreenshotPath = screenshotPath;
         lastScreenshotTime = now;
@@ -137,20 +137,32 @@ async function monitorAndScreenshot(): Promise<void> {
 }
 
 export function startStreaming(): void {
-  if (isStreaming) return;
+  if (isStreaming) {
+    console.log('Streaming already active, ignoring start request');
+    return;
+  }
   
+  console.log('Starting screenshot streaming service...');
   isStreaming = true;
   lastScreenshotTime = 0;
   lastScreenshotPath = null;
   monitorAndScreenshot();
+  console.log('Screenshot streaming service started successfully');
 }
 
 export function stopStreaming(): void {
+  if (!isStreaming) {
+    console.log('Streaming already stopped, ignoring stop request');
+    return;
+  }
+  
+  console.log('Stopping screenshot streaming service...');
   isStreaming = false;
   if (streamingTimeout) {
     clearTimeout(streamingTimeout);
     streamingTimeout = null;
   }
+  console.log('Screenshot streaming service stopped successfully');
 }
 
 export function isStreamingActive(): boolean {

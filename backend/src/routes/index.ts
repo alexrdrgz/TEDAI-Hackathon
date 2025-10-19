@@ -5,6 +5,7 @@ import { getPendingTasks, markTaskAsHandled } from '../services/db';
 import monitorRouter from './monitor';
 import contextRouter from './context';
 import chatRouter from './chat';
+import voiceRouter from './voice';
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.get('/python', (req, res) => {
 router.use('/monitor', monitorRouter);
 router.use('/context', contextRouter);
 router.use('/chat', chatRouter);
+router.use('/voice', voiceRouter);
 
 router.get('/tasks', async (req, res) => {
   try {
