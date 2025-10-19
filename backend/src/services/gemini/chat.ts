@@ -2,6 +2,8 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import { db } from '../db';
 import { getSessionTimeline } from '../timeline';
+import { executeTool, getToolDefinitions } from '../tools';
+import { formatToLocalTime } from '../../utils';
 
 dotenv.config();
 
@@ -31,6 +33,23 @@ interface SessionContext {
     caption: string;
     timestamp: string;
   }>;
+}
+
+interface Part {
+  text?: string;
+  functionCall?: {
+    name: string;
+    args: Record<string, any>;
+  };
+  functionResponse?: {
+    name: string;
+    response: string | Record<string, any>;
+  };
+}
+
+interface Content {
+  role: 'user' | 'model';
+  parts: Part[];
 }
 
 async function getSessionContext(sessionId: string): Promise<SessionContext> {
@@ -83,6 +102,9 @@ Your responses should be:
 - Context-aware based on screen activity
 - Proactive in suggesting relevant actions
 - Professional but friendly
+
+IMPORTANT: You have access to a tool called 'get_snapshot_context' that allows you to dig deeper into any timeline entry. When you want to learn more details about what was happening at a specific time, use this tool and pass the timestamp exactly as it appears in the timeline (e.g., "2025-10-19 14:35:22"). This will return the full context including description, changes, facts, and screenshot information for that moment.
+
 Full history of the session:
 ${sessionTimeline}
 `;
@@ -90,7 +112,7 @@ ${sessionTimeline}
   if (context.snapshots.length > 0) {
     systemPrompt += `\n\nRecent Screen Activity:\n`;
     context.snapshots.reverse().forEach((snap, idx) => {
-      const time = new Date(snap.created_at).toLocaleString();
+      const time = formatToLocalTime(snap.created_at);
       systemPrompt += `\n[${time}] ${snap.caption}`;
       if (snap.facts) {
         systemPrompt += `\nKey facts: ${snap.facts}`;
@@ -101,7 +123,8 @@ ${sessionTimeline}
   if (context.timeline.length > 0) {
     systemPrompt += `\n\nSession Timeline:\n`;
     context.timeline.reverse().forEach((entry) => {
-      systemPrompt += `\n[${entry.timestamp}] ${entry.caption}: ${entry.text}`;
+      const time = formatToLocalTime(entry.timestamp);
+      systemPrompt += `\n[${time}] ${entry.caption}: ${entry.text}`;
     });
   }
 
@@ -113,6 +136,8 @@ export async function generateChatResponse(
   sessionId?: string
 ): Promise<string> {
   const requestId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const maxIterations = 5;
+  let iteration = 0;
 
   try {
     let context: SessionContext = { snapshots: [], timeline: [] };
@@ -125,45 +150,117 @@ export async function generateChatResponse(
     }
 
     const systemPrompt = await buildSystemPrompt(context);
-
-    const contents = messages.map((msg) => ({
+    let contents: Content[] = messages.map((msg) => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: msg.content }]
     }));
 
-    const response = await axios.post(
-      GEMINI_API_URL,
-      {
-        systemInstruction: {
-          parts: [{ text: systemPrompt }]
-        },
-        contents,
-      },
-      {
-        params: {
-          key: GEMINI_API_KEY
-        },
-        timeout: 30000,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        proxy: false
-      }
-    );
+    const toolDefinitions = getToolDefinitions();
 
-    const text = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!text) {
-      console.error(`[ChatResponse:${requestId}] Empty response from API`, {
-        finishReason: response.data.candidates?.[0]?.finishReason,
-        hasContent: !!response.data.candidates?.[0]?.content,
-        hasParts: !!response.data.candidates?.[0]?.content?.parts,
-        usageMetadata: response.data.usageMetadata
+    while (iteration < maxIterations) {
+      iteration++;
+      console.log(`[ChatResponse:${requestId}] Iteration ${iteration}`);
+
+      // Call Gemini with tools
+      const response = await axios.post(
+        GEMINI_API_URL,
+        {
+          systemInstruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          contents,
+          tools: toolDefinitions.length > 0 ? [{ functionDeclarations: toolDefinitions }] : undefined,
+          toolConfig: {
+            functionCallingConfig: {
+              mode: 'AUTO'
+            }
+          }
+        },
+        {
+          params: {
+            key: GEMINI_API_KEY
+          },
+          timeout: 30000,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          proxy: false
+        }
+      );
+
+      const candidate = response.data.candidates?.[0];
+      if (!candidate) {
+        throw new Error('No response candidate from Gemini API');
+      }
+
+      const parts = candidate.content?.parts || [];
+
+      // Extract text response
+      const textParts = parts.filter((p: Part) => p.text).map((p: Part) => p.text);
+      
+      // Extract tool uses
+      const toolUses = parts
+        .filter((p: Part) => p.functionCall)
+        .map((p: Part) => p.functionCall!)
+        .filter((toolUse: any): toolUse is { name: string; args: Record<string, any> } => !!toolUse);
+
+      // If no tool calls or finish reason isn't TOOL_CALLS, return text
+      if (toolUses.length === 0 || candidate.finishReason !== 'TOOL_CALLS') {
+        if (textParts.length > 0) {
+          return textParts.join('');
+        }
+        if (textParts.length === 0 && toolUses.length === 0) {
+          console.warn(`[ChatResponse:${requestId}] No text or tool calls in response`);
+          return 'I encountered an issue processing your request.';
+        }
+      }
+
+      console.log(`[ChatResponse:${requestId}] Executing ${toolUses.length} tool(s)`);
+
+      // Execute tools
+      const toolResults = [];
+      for (const toolUse of toolUses) {
+        try {
+          // Add sessionId to tool args
+          const toolInput = {
+            ...toolUse.args,
+            sessionId: sessionId || '0'
+          };
+          const output = await executeTool(toolUse.name, toolInput);
+          toolResults.push({
+            toolUseId: toolUse.name, // Use tool name as ID for now
+            output
+          });
+        } catch (error: any) {
+          toolResults.push({
+            toolUseId: toolUse.name,
+            output: `Error: ${error.message}`,
+            isError: true
+          });
+        }
+      }
+
+      // Add model response to contents
+      contents.push({
+        role: 'model',
+        parts
       });
-      throw new Error('No response text extracted from Gemini API response');
+
+      // Add tool results to contents
+      contents.push({
+        role: 'user',
+        parts: toolResults.map(result => ({
+          functionResponse: {
+            name: toolUses.find((t: any) => t.name === result.toolUseId)?.name || 'unknown',
+            response: {
+              result: result.output
+            }
+          }
+        }))
+      });
     }
 
-    return text;
+    throw new Error(`Tool calling exceeded maximum iterations (${maxIterations})`);
   } catch (error: any) {
     console.error(`[ChatResponse:${requestId}] Error generating chat response:`, {
       errorType: error.constructor.name,

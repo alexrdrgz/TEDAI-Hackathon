@@ -1,4 +1,5 @@
 import { db } from './db';
+import { formatToLocalTime } from '../utils';
 
 export async function getSessionTimeline(sessionId: string): Promise<string | null> {
   return new Promise((resolve, reject) => {
@@ -11,8 +12,8 @@ export async function getSessionTimeline(sessionId: string): Promise<string | nu
         else {
           const timeline = rows
             .map((row) => {
-              const date = new Date(row.timestamp).toLocaleString();
-              return `${date}: ${row.text}`;
+              const formatted = formatToLocalTime(row.timestamp);
+              return `${formatted}: ${row.text}`;
             })
             .join('\n\n');
           resolve(timeline);

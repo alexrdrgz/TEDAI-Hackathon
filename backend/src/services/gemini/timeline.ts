@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { TimelineEntrySchema } from '../../models/index';
+import { formatToLocalTime } from '../../utils';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -43,8 +44,7 @@ export async function generateSessionTimeline(
   return withRetry(async () => {
     const context = snapshots
       .map((snap) => {
-        const utcDate = new Date(snap.created_at);
-        const localTime = utcDate.toLocaleString();
+        const localTime = formatToLocalTime(snap.created_at);
         const changesText = snap.changes.length
           ? snap.changes.map((c) => `- ${c}`).join('\n')
           : '(No changes from previous)';
@@ -75,7 +75,7 @@ export async function generateTimelineEntry(
       model: 'gemini-2.5-flash',
     });
 
-    const timestamp = new Date(createdAt).toLocaleString();
+    const timestamp = formatToLocalTime(createdAt);
     const changesText = changes.length
       ? changes.map((c) => `- ${c}`).join('\n')
       : '(No changes from previous)';

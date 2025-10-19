@@ -10,8 +10,8 @@ export async function addSnapshot(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO snapshots (screenshot_path, caption, full_description, changes, facts, session_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [screenshotPath, caption, fullDescription, JSON.stringify(changes), JSON.stringify(facts), sessionId],
+      'INSERT INTO snapshots (screenshot_path, caption, full_description, changes, facts, session_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [screenshotPath, caption, fullDescription, JSON.stringify(changes), JSON.stringify(facts), sessionId, new Date().toISOString()],
       (err: Error | null) => {
         if (err) reject(err);
         else resolve();

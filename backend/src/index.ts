@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import routes from './routes';
 import { initDatabase } from './services/db';
+import { initializeTools } from './services/tools';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,6 +59,7 @@ app.use('/api', routes);
 (async () => {
   try {
     await initDatabase();
+    initializeTools();
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
