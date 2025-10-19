@@ -44,6 +44,7 @@ async function getSessionContext(sessionId: string): Promise<SessionContext> {
       [sessionId],
       (err, snapshots: any[]) => {
         if (err) {
+          console.error(`[SessionContext] Error fetching snapshots for session ${sessionId}:`, err);
           reject(err);
           return;
         }
@@ -57,6 +58,7 @@ async function getSessionContext(sessionId: string): Promise<SessionContext> {
           [sessionId],
           (err, timeline: any[]) => {
             if (err) {
+              console.error(`[SessionContext] Error fetching timeline for session ${sessionId}:`, err);
               reject(err);
               return;
             }
@@ -110,13 +112,15 @@ export async function generateChatResponse(
   messages: ChatMessage[],
   sessionId?: string
 ): Promise<string> {
+  const requestId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
   try {
     let context: SessionContext = { snapshots: [], timeline: [] };
     if (sessionId) {
       try {
         context = await getSessionContext(sessionId);
       } catch (err) {
-        console.error('Error fetching session context:', err);
+        console.error(`[ChatResponse:${requestId}] Error fetching session context:`, err);
       }
     }
 
@@ -134,12 +138,6 @@ export async function generateChatResponse(
           parts: [{ text: systemPrompt }]
         },
         contents,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        }
       },
       {
         params: {
@@ -156,12 +154,33 @@ export async function generateChatResponse(
     const text = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (!text) {
-      throw new Error('No response from Gemini API');
+      console.error(`[ChatResponse:${requestId}] Empty response from API`, {
+        finishReason: response.data.candidates?.[0]?.finishReason,
+        hasContent: !!response.data.candidates?.[0]?.content,
+        hasParts: !!response.data.candidates?.[0]?.content?.parts,
+        usageMetadata: response.data.usageMetadata
+      });
+      throw new Error('No response text extracted from Gemini API response');
     }
 
     return text;
   } catch (error: any) {
-    console.error('Error generating chat response:', error.response?.data || error.message);
-    throw new Error('Failed to generate chat response');
+    console.error(`[ChatResponse:${requestId}] Error generating chat response:`, {
+      errorType: error.constructor.name,
+      message: error.message,
+      code: error.code,
+      statusCode: error.response?.status,
+      statusText: error.response?.statusText,
+      apiErrorData: error.response?.data,
+      requestUrl: error.config?.url,
+      requestMethod: error.config?.method,
+      timestamp: new Date().toISOString()
+    });
+    
+    if (error.response?.data) {
+      console.error(`[ChatResponse:${requestId}] Full API error response:`, JSON.stringify(error.response.data, null, 2));
+    }
+    
+    throw new Error(`Failed to generate chat response: ${error.message}`);
   }
 }
