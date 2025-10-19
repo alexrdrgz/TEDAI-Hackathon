@@ -572,21 +572,17 @@ function showNotification(taskData) {
 
   // Initialize swipe gesture handler
   if (typeof SwipeGestureHandler !== 'undefined') {
-    console.log('[StickyButton] Initializing swipe gestures for notification');
     try {
       currentSwipeHandler = new SwipeGestureHandler(swipeableElement, {
         threshold: 0.35,
         minDistance: 80,
         onSwipeRight: () => {
-          console.log('[StickyButton] Swipe right - Approving task:', taskData.id);
           approveTask(taskData.id);
         },
         onSwipeLeft: () => {
-          console.log('[StickyButton] Swipe left - Rejecting task:', taskData.id);
           rejectTask(taskData.id);
         }
       });
-      console.log('[StickyButton] Swipe gestures initialized successfully');
     } catch (error) {
       console.error('[StickyButton] Failed to initialize swipe gestures:', error);
     }
@@ -776,7 +772,6 @@ function renderQueueView(tasks) {
   
   // Initialize swipe gestures for each queue item
   if (typeof SwipeGestureHandler !== 'undefined' && tasks.length > 0) {
-    console.log('[StickyButton] Initializing swipe gestures for', tasks.length, 'queue items');
     const queueItems = queueContent.querySelectorAll('.tedai-queue-item');
     queueItems.forEach(item => {
       const taskId = item.dataset.taskId;
@@ -785,11 +780,9 @@ function renderQueueView(tasks) {
           threshold: 0.35,
           minDistance: 80,
           onSwipeRight: () => {
-            console.log('[StickyButton] Queue item swipe right - Approving task:', taskId);
             approveTask(taskId);
           },
           onSwipeLeft: () => {
-            console.log('[StickyButton] Queue item swipe left - Rejecting task:', taskId);
             rejectTask(taskId);
           }
         });
@@ -797,7 +790,6 @@ function renderQueueView(tasks) {
         console.error('[StickyButton] Failed to initialize swipe for item:', taskId, error);
       }
     });
-    console.log('[StickyButton] Queue swipe gestures initialized');
 
     // Add button click handlers as fallback
     queueContent.querySelectorAll('.tedai-queue-approve-btn').forEach(btn => {
@@ -881,69 +873,53 @@ function clearAutoCollapseTimeout() {
 
 // Approve task
 function approveTask(taskId) {
-  console.log('[StickyButton] ✓ Approving task:', taskId);
-  console.log('[StickyButton] Current state:', currentState);
-  
   // Send message to background script
   const sent = safeSendMessage({ 
     type: 'APPROVE_TASK', 
     taskId: taskId 
   }, (response) => {
-    console.log('[StickyButton] Approve response received:', response);
     if (response && response.success) {
-      console.log('[StickyButton] ✓ Task approved successfully, opening Gmail/Calendar...');
-      
       // Refresh the view after a short delay to allow animation
       setTimeout(() => {
         if (currentState === 'notification') {
-          console.log('[StickyButton] Collapsing notification');
           requestTaskCountAndCollapse();
         } else if (currentState === 'queue') {
-          console.log('[StickyButton] Refreshing queue view');
           showQueueView(); // Refresh queue view
         }
       }, 350);
     } else {
-      console.error('[StickyButton] ✗ Failed to approve task:', response);
+      console.error('[StickyButton] Failed to approve task:', response);
     }
   });
   
   if (!sent) {
-    console.error('[StickyButton] ✗ Failed to send approve message - extension context may be invalid');
+    console.error('[StickyButton] Failed to send approve message - extension context may be invalid');
   }
 }
 
 // Reject task
 function rejectTask(taskId) {
-  console.log('[StickyButton] ✗ Rejecting task:', taskId);
-  console.log('[StickyButton] Current state:', currentState);
-  
   // Send message to background script
   const sent = safeSendMessage({ 
     type: 'REJECT_TASK', 
     taskId: taskId 
   }, (response) => {
-    console.log('[StickyButton] Reject response received:', response);
     if (response && response.success) {
-      console.log('[StickyButton] ✗ Task rejected successfully');
-      
       // Refresh the view after a short delay to allow animation
       setTimeout(() => {
         if (currentState === 'notification') {
-          console.log('[StickyButton] Collapsing notification');
           requestTaskCountAndCollapse();
         } else if (currentState === 'queue') {
-          console.log('[StickyButton] Refreshing queue view');
           showQueueView(); // Refresh queue view
         }
       }, 350);
     } else {
-      console.error('[StickyButton] ✗ Failed to reject task:', response);
+      console.error('[StickyButton] Failed to reject task:', response);
     }
   });
   
   if (!sent) {
-    console.error('[StickyButton] ✗ Failed to send reject message - extension context may be invalid');
+    console.error('[StickyButton] Failed to send reject message - extension context may be invalid');
   }
 }
 
@@ -980,4 +956,3 @@ safeSendMessage({ type: 'GET_PENDING_TASK_COUNT' }, (response) => {
 });
 
 console.log('[StickyButton] Content script loaded');
-console.log('[StickyButton] SwipeGestureHandler available:', typeof SwipeGestureHandler !== 'undefined');
