@@ -1,36 +1,24 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import * as fs from 'fs';
+import axios from 'axios';
 import dotenv from 'dotenv';
+import * as fs from 'fs';
+import { executeTool, getTaskCreationToolDefinitions } from '../tools';
 
 dotenv.config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
-
-interface RetryOptions {
-  maxRetries?: number;
-  delayMs?: number;
+interface Part {
+  text?: string;
+  functionCall?: {
+    name: string;
+    args: Record<string, any>;
+  };
 }
 
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const maxRetries = options.maxRetries ?? MAX_RETRIES;
-  const delayMs = options.delayMs ?? RETRY_DELAY_MS;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (attempt === maxRetries) throw error;
-      await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
-    }
-  }
-
-  throw new Error('Retry exhausted');
+interface Content {
+  role: 'user' | 'model';
+  parts: Part[];
 }
 
 export async function checkAndGenerateTask(
@@ -39,19 +27,15 @@ export async function checkAndGenerateTask(
   changes: string[],
   currentTimeline: string | null,
   fullDescription: string
-): Promise<{
-  shouldCreate: boolean;
-  taskType?: 'email' | 'calendar' | string;
-  reasoning?: string;
-  taskData?: any;
-} | null> {
-  return withRetry(async () => {
+): Promise<void> {
+  if (!GEMINI_API_KEY) {
+    console.error('[checkAndGenerateTask] GEMINI_API_KEY not set');
+    return;
+  }
+
+  try {
     const imageBuffer = fs.readFileSync(screenshotPath);
     const imageData = imageBuffer.toString('base64');
-
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-    });
 
     const timelineContext = currentTimeline
       ? `\n\nCurrent timeline so far:\n${currentTimeline}\n\n---\n\n`
@@ -61,75 +45,102 @@ export async function checkAndGenerateTask(
       ? changes.map((c) => `- ${c}`).join('\n')
       : '(No changes from previous)';
 
-    const prompt = `${timelineContext}You are analyzing a user's current screen activity to determine if an actionable task should be created.
+    const systemPrompt = `You are an AI assistant that analyzes user screen activity to determine if actionable tasks should be created.
+
+Analyze the current activity. If it makes sense to create an email or calendar event based on what the user is doing, use the appropriate tool to create it. Otherwise, simply respond that no task is needed.
+
+Be selective - only create tasks when they would be genuinely helpful.`;
+
+    const userPrompt = `${timelineContext}Analyze this screenshot and determine if a task should be created.
 
 Current Activity:
 - Task: ${caption}
-- full description: ${fullDescription}
+- Description: ${fullDescription}
 - Changes: ${changesText}
 
-Analyze the screenshot and the timeline to decide if an actionable task should be created. Be somewhat careful not to generate suggestions needlessly, but do so when it seems relevant and helpful.
+If you think an email or calendar event should be created, use the appropriate tool. Otherwise, just say no task is needed.`;
 
-Consider these task types:
-- "email": If the user should clearly draft communication with someone through email
-- "calendar": If the user is scheduling a meeting, managing calendar events, or should schedule something
-
-If creating an EMAIL task, generate complete email data with subject and body.
-If creating a CALENDAR task, generate event details including title, description, times, and attendees.
-
-Return a JSON object with:
-{
-  "shouldCreate": boolean,
-  "taskType": "email" | "calendar" | "other" | null,
-  "reasoning": "brief explanation of why or why not to create a task",
-  "taskData": { 
-    // (leave empty if shouldCreate is false)
-    // If email task:
-    // {
-    //   "to": "recipient@email.com",
-    //   "subject": "Generated subject line",
-    //   "body": "Generated professional email body"
-    // }
-    //
-    // If calendar task:
-    // {
-    //   "title": "Meeting title",
-    //   "description": "Event description",
-    //   "startTime": "ISO timestamp",
-    //   "endTime": "ISO timestamp",
-    //   "attendees": ["email@example.com"],
-    //   "location": "optional location"
-    // }
-  }
-}`;
-
-    const response = await model.generateContent([
+    let contents: Content[] = [
       {
-        inlineData: {
-          mimeType: 'image/png',
-          data: imageData,
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              mimeType: 'image/png',
+              data: imageData,
+            },
+          } as any,
+          {
+            text: userPrompt,
+          },
+        ],
+      },
+    ];
+
+    const toolDefinitions = getTaskCreationToolDefinitions();
+
+    // Single iteration - let AI decide if it needs to call a tool
+    const response = await axios.post(
+      GEMINI_API_URL,
+      {
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
         },
+        contents,
+        tools: toolDefinitions.length > 0 ? [{ functionDeclarations: toolDefinitions }] : undefined,
+        toolConfig: {
+          functionCallingConfig: {
+            mode: 'AUTO'
+          }
+        }
       },
       {
-        text: prompt,
-      },
-    ]);
+        params: {
+          key: GEMINI_API_KEY
+        },
+        timeout: 30000,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        proxy: false
+      }
+    );
 
-    const text = response.response.text();
-    console.log("checkAndGenerateTask response: ", text);
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      throw new Error('Failed to extract JSON from response');
+    const candidate = response.data.candidates?.[0];
+    if (!candidate) {
+      console.log('[checkAndGenerateTask] No response from Gemini');
+      return;
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
-    
-    return {
-      shouldCreate: parsed.shouldCreate ?? false,
-      taskType: parsed.taskType ?? undefined,
-      reasoning: parsed.reasoning ?? undefined,
-      taskData: parsed.taskData ?? undefined,
-    };
-  });
+    const parts = candidate.content?.parts || [];
+
+    // Extract text response
+    const textParts = parts.filter((p: Part) => p.text).map((p: Part) => p.text);
+
+    // Extract tool calls
+    const toolUses = parts
+      .filter((p: Part) => p.functionCall)
+      .map((p: Part) => p.functionCall!)
+      .filter((toolUse: any): toolUse is { name: string; args: Record<string, any> } => !!toolUse);
+
+    // If no tool calls, just log and return
+    if (toolUses.length === 0) {
+      const responseText = textParts.join('');
+      console.log('[checkAndGenerateTask] No task needed:', responseText);
+      return;
+    }
+
+    // Execute tools
+    console.log(`[checkAndGenerateTask] Executing ${toolUses.length} tool(s)`);
+    for (const toolUse of toolUses) {
+      try {
+        const output = await executeTool(toolUse.name, toolUse.args);
+        console.log(`[checkAndGenerateTask] Tool ${toolUse.name} executed:`, output);
+      } catch (error: any) {
+        console.error(`[checkAndGenerateTask] Error executing tool ${toolUse.name}:`, error.message);
+      }
+    }
+  } catch (error: any) {
+    console.error('[checkAndGenerateTask] Error:', error.message);
+  }
 }

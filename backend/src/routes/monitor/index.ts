@@ -5,13 +5,8 @@ import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask } from
 import { addSnapshot, getLastSessionSnapshot } from '../../services/snapshots';
 import { getSessionTimeline, addTimelineEntry } from '../../services/timeline';
 import { startStreaming, stopStreaming, isStreamingActive } from '../../services/streaming';
-import { createTask } from '../../services/db';
 
 const router = Router();
-
-function generateTaskId(): string {
-  return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
 
 router.get('/screenshot', async (req, res) => {
   try {
@@ -58,29 +53,16 @@ router.get('/screenshot', async (req, res) => {
           // Store in database
           await addSnapshot(filePath, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
           
-          // Get current timeline for task generation
+          // Get current timeline and generate new entry
           const currentTimeline = await getSessionTimeline(sessionId);
-          
-          // Generate timeline entry and check for tasks in parallel
           const timestamp = new Date().toISOString();
-          
-          const [newEntry, taskCheckResult] = await Promise.all([
-            generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp),
-            checkAndGenerateTask(filePath, summary.Caption, summary.Changes, currentTimeline, summary.FullDescription)
-          ]);
-          
+          const newEntry = await generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp);
           await addTimelineEntry(sessionId, newEntry, summary.Caption, timestamp);
           
-          // Create task if recommended by Gemini
-          if (taskCheckResult?.shouldCreate && taskCheckResult?.taskType) {
-            try {
-              const taskId = generateTaskId();
-              console.log(`Creating ${taskCheckResult.taskType} task:`, taskCheckResult.reasoning);
-              await createTask(taskId, taskCheckResult.taskType, taskCheckResult.taskData || {});
-            } catch (taskError) {
-              console.error('Error creating auto-generated task:', taskError);
-            }
-          }
+          // Check if AI should create a task using tools
+          checkAndGenerateTask(filePath, summary.Caption, summary.Changes, currentTimeline, summary.FullDescription).catch((err) => {
+            console.error('Error checking for task generation:', err);
+          });
           
           res.json({ 
             screenshot: filePath, 
