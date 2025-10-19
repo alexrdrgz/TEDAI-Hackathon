@@ -39,15 +39,6 @@ class TaskQueueManager {
             const result = await chrome.storage.local.get(['screenshotMonitoringEnabled']);
             this.screenshotMonitoringEnabled = result.screenshotMonitoringEnabled || false;
             this.updateToggleUI();
-            
-            // Log initial state
-            if (this.screenshotMonitoringEnabled) {
-                console.log('🟢 Screenshot streaming state loaded: ACTIVE (was previously enabled)');
-            } else {
-                console.log('🔴 Screenshot streaming state loaded: INACTIVE (was previously disabled)');
-            }
-            
-            console.log('Loaded toggle state:', this.screenshotMonitoringEnabled);
         } catch (error) {
             console.error('Failed to load toggle state:', error);
         }
@@ -60,8 +51,6 @@ class TaskQueueManager {
         const screenshotToggle = document.getElementById('screenshotToggle');
         if (screenshotToggle) {
             screenshotToggle.addEventListener('click', () => {
-                const currentState = this.screenshotMonitoringEnabled;
-                console.log(`🔄 Screenshot toggle clicked! Current state: ${currentState ? 'ON' : 'OFF'}`);
                 this.toggleScreenshotMonitoring();
             });
         } else {
@@ -400,42 +389,24 @@ class TaskQueueManager {
 
     async toggleScreenshotMonitoring() {
         const newState = !this.screenshotMonitoringEnabled;
-        console.log('Toggling screenshot monitoring to:', newState);
         
         // Disable toggle during API call
         this.setToggleDisabled(true);
         
         try {
-            console.log(`🌐 Making API request to: http://localhost:3000/api/monitor/streaming?on=${newState}`);
             const response = await fetch(`http://localhost:3000/api/monitor/streaming?on=${newState}`);
-            console.log('📡 API Response status:', response.status, response.statusText);
             const data = await response.json();
-            console.log('📦 API Response data:', data);
             
             if (response.ok) {
                 this.screenshotMonitoringEnabled = newState;
                 await this.saveToggleState();
                 this.updateToggleUI();
-                
-                // Log streaming state changes
-                if (newState) {
-                    console.log('🟢 Screenshot streaming STARTED - Monitoring is now active');
-                } else {
-                    console.log('🔴 Screenshot streaming STOPPED - Monitoring is now inactive');
-                }
-                
-                console.log('Screenshot monitoring toggled successfully:', data);
             } else {
                 console.error('Failed to toggle screenshot monitoring:', data);
                 this.showToggleError();
             }
         } catch (error) {
-            console.error('❌ Error toggling screenshot monitoring:', error);
-            console.error('❌ Error details:', {
-                name: error.name,
-                message: error.message,
-                stack: error.stack
-            });
+            console.error('Error toggling screenshot monitoring:', error);
             this.showToggleError();
         } finally {
             this.setToggleDisabled(false);
@@ -447,7 +418,6 @@ class TaskQueueManager {
             await chrome.storage.local.set({ 
                 screenshotMonitoringEnabled: this.screenshotMonitoringEnabled 
             });
-            console.log('Saved toggle state:', this.screenshotMonitoringEnabled);
         } catch (error) {
             console.error('Failed to save toggle state:', error);
         }
