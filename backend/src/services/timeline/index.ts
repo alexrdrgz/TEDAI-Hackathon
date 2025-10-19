@@ -1,94 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import * as fs from 'fs';
-import { ScreenshotSummary, ScreenshotSummarySchema, TimelineEntry, TimelineEntrySchema } from '../models/index';
+import { TimelineEntrySchema } from '../../models/index';
+import { withRetry } from '../retry';
+import { db } from '../db';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
-
-interface RetryOptions {
-  maxRetries?: number;
-  delayMs?: number;
-}
-
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
-  const maxRetries = options.maxRetries ?? MAX_RETRIES;
-  const delayMs = options.delayMs ?? RETRY_DELAY_MS;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (attempt === maxRetries) throw error;
-      await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
-    }
-  }
-
-  throw new Error('Retry exhausted');
-}
-
-export async function summarizeScreenshotStructured(
-  screenshotPath: string,
-  previousSummary?: ScreenshotSummary
-): Promise<ScreenshotSummary> {
-  return withRetry(async () => {
-    const imageBuffer = fs.readFileSync(screenshotPath);
-    const imageData = imageBuffer.toString('base64');
-
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-    });
-
-    let prompt = `Analyze this screenshot and provide:
-1. FullDescription: A 1 paragraph explanation of what is visible
-2. Caption: A 1 sentence summary of the image, focusing on which task the user is performing
-3. Changes: An array of short snippets of what changed (if there's a previous screenshot context, compare; if not, use empty array)
-4. Facts: An array of 0-3 facts that can be learned from the screenshot
-
-Return a JSON object with these exact keys.`;
-
-    if (previousSummary) {
-      prompt += `\n\nPrevious screenshot summary for context:
-Caption: ${previousSummary.Caption}
-Previous Changes: ${previousSummary.Changes.join('; ')}
-
-Now describe what CHANGED from that previous state to this new screenshot.`;
-    }
-
-    const response = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: 'image/png',
-          data: imageData,
-        },
-      },
-      {
-        text: prompt,
-      },
-    ]);
-
-    const text = response.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      throw new Error('Failed to extract JSON from response');
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    const validated = ScreenshotSummarySchema.parse(parsed);
-
-    return validated;
-  });
-}
-
-export async function generateSessionTimelineStructured(
+export async function generateSessionTimeline(
   snapshots: Array<{
     caption: string;
     changes: string[];
@@ -164,5 +84,45 @@ Return a JSON object with:
     const validated = TimelineEntrySchema.parse(parsed);
 
     return validated.entry;
+  });
+}
+
+export async function getSessionTimeline(sessionId: string): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    db.all(
+      'SELECT text, timestamp FROM timeline_entries WHERE session_id = ? ORDER BY created_at ASC',
+      [sessionId],
+      (err: Error | null, rows: any[]) => {
+        if (err) reject(err);
+        else if (!rows || rows.length === 0) resolve(null);
+        else {
+          const timeline = rows
+            .map((row) => {
+              const date = new Date(row.timestamp).toLocaleString();
+              return `${date}: ${row.text}`;
+            })
+            .join('\n\n');
+          resolve(timeline);
+        }
+      }
+    );
+  });
+}
+
+export async function addTimelineEntry(
+  sessionId: string,
+  text: string,
+  caption: string,
+  timestamp: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO timeline_entries (session_id, text, caption, timestamp) VALUES (?, ?, ?, ?)',
+      [sessionId, text, caption, timestamp],
+      (err: Error | null) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
   });
 }

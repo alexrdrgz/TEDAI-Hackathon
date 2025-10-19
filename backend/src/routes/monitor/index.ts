@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshotStructured, generateTimelineEntry } from '../../services/gemini-structured';
+import { summarizeScreenshot } from '../../services/screenshots';
+import { generateTimelineEntry, generateSessionTimeline } from '../../services/timeline';
 import { addSnapshot, getLastSessionSnapshot } from '../../services/snapshots';
 import { getSessionTimeline, addTimelineEntry } from '../../services/timeline';
 import { startStreaming, stopStreaming, isStreamingActive } from '../../services/streaming';
@@ -39,7 +40,7 @@ router.get('/screenshot', async (req, res) => {
           const previousSnapshot = await getLastSessionSnapshot(sessionId);
           
           // Summarize with context - only pass previous summary if it exists
-          const summary = await summarizeScreenshotStructured(
+          const summary = await summarizeScreenshot(
             filePath,
             previousSnapshot ? { Caption: previousSnapshot.caption, FullDescription: '', Changes: previousSnapshot.changes, Facts: [] } : undefined
           );
