@@ -7,7 +7,7 @@ import { initializeTools } from './services/tools';
 import { execSync } from 'child_process';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // CORS Configuration - production-ready with allowlist

@@ -1,6 +1,12 @@
 // Background service worker for TEDAI Chrome Extension
 console.log('TEDAI AI Agent background script loaded');
 
+// Configuration
+const CONFIG = {
+  API_BASE_URL: 'http://localhost:3030/api'
+};
+console.log('CONFIG loaded:', CONFIG);
+
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('TEDAI AI Agent installed:', details.reason);
 });
@@ -149,26 +155,34 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // Poll for tasks from server
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = CONFIG.API_BASE_URL;
 let pollingInterval = null;
+
+console.log('Using API Base URL:', API_BASE_URL);
 
 async function pollForTasks() {
   try {
+    console.log('[Polling] Fetching tasks from:', `${API_BASE_URL}/tasks`);
     const response = await fetch(`${API_BASE_URL}/tasks`);
+    
     if (!response.ok) {
-      console.error('Failed to fetch tasks:', response.status);
+      console.error('[Polling] Failed to fetch tasks:', response.status);
       return;
     }
     
     const { tasks } = await response.json();
+    console.log('[Polling] Received tasks:', tasks?.length || 0);
     
     if (tasks && tasks.length > 0) {
       // Add new tasks to local storage
       const existingTasks = await getTasks();
       const existingTaskIds = new Set(existingTasks.map(t => t.id));
+      console.log('[Polling] Existing tasks:', existingTaskIds.size);
       
+      let newTasksAdded = 0;
       for (const task of tasks) {
         if (!existingTaskIds.has(task.id)) {
+          console.log('[Polling] Adding new task:', task.id, task.type);
           await handleAddTask(task);
           
           // Mark task as handled on server
@@ -176,36 +190,70 @@ async function pollForTasks() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
           });
+          newTasksAdded++;
         }
       }
+      console.log('[Polling] Added', newTasksAdded, 'new tasks');
     }
   } catch (error) {
-    console.error('Error polling for tasks:', error);
+    console.error('[Polling] Error:', error);
   }
 }
 
+// Make it globally accessible for debugging
+globalThis.pollForTasks = pollForTasks;
+
+// Clear all tasks from storage (for debugging/resetting)
+globalThis.clearAllTasks = async function() {
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEY]: [] });
+    await updateBadgeCount();
+    console.log('[clearAllTasks] All tasks cleared from storage');
+  } catch (error) {
+    console.error('[clearAllTasks] Error:', error);
+  }
+};
+
 // Start polling
 function startPolling() {
-  if (pollingInterval) return;
+  console.log('[startPolling] Function called');
   
-  // Disable polling for now to avoid CORS issues
-  console.log('Polling disabled - tasks will be managed locally');
-  return;
+  if (pollingInterval) {
+    console.log('[startPolling] Already polling, skipping');
+    return;
+  }
   
-  pollingInterval = setInterval(pollForTasks, 500);
-  console.log('Started polling for tasks every 500ms');
+  console.log('[startPolling] Setting up interval');
+  pollingInterval = setInterval(pollForTasks, 5000); // Poll every 5 seconds
+  console.log('[startPolling] Started polling for tasks every 5 seconds');
   
   // Initial poll
+  console.log('[startPolling] Triggering initial poll');
   pollForTasks();
 }
 
 // Initialize badge count and start polling on startup
 (async () => {
   try {
+    console.log('[Init] Initializing background script...');
+    console.log('[Init] API_BASE_URL:', API_BASE_URL);
+    
+    // Clear any old non-pending tasks on startup
+    const allTasks = await getTasks();
+    const pendingTasks = allTasks.filter(t => t.status === 'pending');
+    if (allTasks.length !== pendingTasks.length) {
+      console.log('[Init] Clearing', allTasks.length - pendingTasks.length, 'old processed tasks');
+      await chrome.storage.local.set({ [STORAGE_KEY]: pendingTasks });
+    }
+    
+    console.log('[Init] Updating badge count...');
     await updateBadgeCount();
+    console.log('[Init] Badge count updated');
+    console.log('[Init] Starting polling...');
     startPolling();
+    console.log('[Init] Initialization complete');
   } catch (error) {
-    console.error('Failed to initialize:', error);
+    console.error('[Init] Failed to initialize:', error);
   }
 })();
 
