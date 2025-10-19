@@ -38,12 +38,18 @@ export async function checkAndGenerateTask(
   caption: string,
   changes: string[],
   currentTimeline: string | null,
-  fullDescription: string
+  fullDescription: string,
+  isMessagingApp?: boolean
 ): Promise<{
   shouldCreate: boolean;
-  taskType?: 'email' | 'calendar' | string;
+  taskType?: 'email' | 'calendar' | 'reminder' | string;
   reasoning?: string;
   taskData?: any;
+  multipleTasks?: Array<{
+    taskType: string;
+    reasoning: string;
+    taskData: any;
+  }>;
 } | null> {
   return withRetry(async () => {
     const imageBuffer = fs.readFileSync(screenshotPath);
@@ -67,20 +73,23 @@ Current Activity:
 - Task: ${caption}
 - full description: ${fullDescription}
 - Changes: ${changesText}
+${isMessagingApp ? '- This is a MESSAGING APPLICATION - look for action items in messages' : ''}
 
 Analyze the screenshot and the timeline to decide if an actionable task should be created. Be somewhat careful not to generate suggestions needlessly, but do so when it seems relevant and helpful.
 
-Consider these task types:
-- "email": If the user should clearly draft communication with someone through email
-- "calendar": If the user is scheduling a meeting, managing calendar events, or should schedule something
+Consider these ACTIONABLE TASK TYPES (executable integrations):
+- "email": Draft communication via Gmail compose - use when the user should send an email or reply
+- "calendar": Create Google Calendar event - use for meetings, scheduling, time-based commitments
+- "reminder": Set Google Calendar reminder/task - use for deadlines, follow-ups, tasks to complete, things not to forget
 
-If creating an EMAIL task, generate complete email data with subject and body.
-If creating a CALENDAR task, generate event details including title, description, times, and attendees.
+If creating an EMAIL task, generate complete email data with to, subject, and body.
+If creating a CALENDAR task, generate event details including title, description, startTime, endTime, and attendees.
+If creating a REMINDER task, generate title, description, and remindAt (ISO timestamp).
 
 Return a JSON object with:
 {
   "shouldCreate": boolean,
-  "taskType": "email" | "calendar" | "other" | null,
+  "taskType": "email" | "calendar" | "reminder" | "other" | null,
   "reasoning": "brief explanation of why or why not to create a task",
   "taskData": { 
     // (leave empty if shouldCreate is false)
@@ -99,6 +108,13 @@ Return a JSON object with:
     //   "endTime": "ISO timestamp",
     //   "attendees": ["email@example.com"],
     //   "location": "optional location"
+    // }
+    //
+    // If reminder task:
+    // {
+    //   "title": "Task title",
+    //   "description": "Details about what to do",
+    //   "remindAt": "ISO timestamp"
     // }
   }
 }`;

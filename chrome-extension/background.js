@@ -69,6 +69,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.log('Handling ADD_TEST_EMAIL_TASK message...');
       globalThis.addTestEmailTask().then(() => {
         console.log('Email task added successfully');
+        // Notify popup to refresh
+        chrome.runtime.sendMessage({ type: 'TASKS_UPDATED' }).catch(() => {});
         sendResponse({ success: true });
       }).catch(error => {
         console.error('Error handling ADD_TEST_EMAIL_TASK:', error);
@@ -79,6 +81,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.log('Handling ADD_TEST_CALENDAR_TASK message...');
       globalThis.addTestCalendarTask().then(() => {
         console.log('Calendar task added successfully');
+        // Notify popup to refresh
+        chrome.runtime.sendMessage({ type: 'TASKS_UPDATED' }).catch(() => {});
         sendResponse({ success: true });
       }).catch(error => {
         console.error('Error handling ADD_TEST_CALENDAR_TASK:', error);
@@ -127,6 +131,11 @@ async function handleUpdateTask(taskId, updates) {
         
         chrome.alarms.create(alarmName, { when: alarmTime });
       }
+      
+      // Notify popup to refresh
+      chrome.runtime.sendMessage({ type: 'TASKS_UPDATED' }).catch(() => {
+        // Popup might not be open, that's okay
+      });
     }
   } catch (error) {
     console.error('Failed to update task:', error);
@@ -194,6 +203,15 @@ async function pollForTasks() {
         }
       }
       console.log('[Polling] Added', newTasksAdded, 'new tasks');
+      
+      // Notify any open popups about the update
+      if (newTasksAdded > 0) {
+        console.log('[Polling] Broadcasting TASKS_UPDATED message to popup');
+        chrome.runtime.sendMessage({ type: 'TASKS_UPDATED' }).catch(() => {
+          // Popup might not be open, that's okay
+          console.log('[Polling] No popup open to receive update');
+        });
+      }
     }
   } catch (error) {
     console.error('[Polling] Error:', error);

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask } from '../../services/gemini';
+import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask, analyzeMessagingForActionItems } from '../../services/gemini';
 import { addSnapshot, getLastSessionSnapshot } from '../../services/snapshots';
 import { getSessionTimeline, addTimelineEntry } from '../../services/timeline';
 import { startStreaming, stopStreaming, isStreamingActive } from '../../services/streaming';
@@ -66,13 +66,41 @@ router.get('/screenshot', async (req, res) => {
           
           const [newEntry, taskCheckResult] = await Promise.all([
             generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp),
-            checkAndGenerateTask(filePath, summary.Caption, summary.Changes, currentTimeline, summary.FullDescription)
+            checkAndGenerateTask(filePath, summary.Caption, summary.Changes, currentTimeline, summary.FullDescription, summary.isMessagingApp)
           ]);
           
           await addTimelineEntry(sessionId, newEntry, summary.Caption, timestamp);
           
-          // Create task if recommended by Gemini
-          if (taskCheckResult?.shouldCreate && taskCheckResult?.taskType) {
+          // If this is a messaging app, use specialized action item detection
+          if (summary.isMessagingApp) {
+            console.log('📱 Messaging app detected - analyzing for action items...');
+            try {
+              const actionItems = await analyzeMessagingForActionItems(
+                filePath, 
+                summary.FullDescription, 
+                summary.Caption
+              );
+              
+              console.log(`Found ${actionItems.length} action items in messaging app`);
+              
+              // Create tasks for each detected action item
+              for (const item of actionItems) {
+                try {
+                  const taskId = generateTaskId();
+                  console.log(`Creating ${item.taskType} task from message:`, item.reasoning);
+                  await createTask(taskId, item.taskType, item.taskData);
+                } catch (taskError) {
+                  console.error('Error creating messaging action item task:', taskError);
+                }
+              }
+            } catch (messagingError) {
+              console.error('Error analyzing messaging app for action items:', messagingError);
+              // Fall back to regular task detection
+            }
+          }
+          
+          // Create task if recommended by regular Gemini analysis (if not handled by messaging detection)
+          if (!summary.isMessagingApp && taskCheckResult?.shouldCreate && taskCheckResult?.taskType) {
             try {
               const taskId = generateTaskId();
               console.log(`Creating ${taskCheckResult.taskType} task:`, taskCheckResult.reasoning);
