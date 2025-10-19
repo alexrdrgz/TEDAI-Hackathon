@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshot, generateEmailFromContext, generateCalendarFromContext } from '../services/gemini';
+import { generateEmailFromContext } from '../services/email';
+import { generateCalendarFromContext } from '../services/calendar';
 import { getRandomEmailScenario, getRandomCalendarScenario, getEmailScenarioById, getCalendarScenarioById } from '../data/mockScenarios';
 import monitorRouter from './monitor';
 import contextRouter from './context';
