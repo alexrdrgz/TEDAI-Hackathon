@@ -16,7 +16,21 @@ class TaskQueueManager {
         await this.loadTasks();
         await this.initScreenshotToggle();
         this.setupEventListeners();
+        this.setupMessageListener();
         this.render();
+    }
+
+    setupMessageListener() {
+        // Listen for task updates from background script
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            console.log('Popup received message:', message);
+            if (message.type === 'TASKS_UPDATED') {
+                console.log('Tasks updated, reloading...');
+                this.loadTasks().then(() => {
+                    this.render();
+                });
+            }
+        });
     }
 
     async loadTasks() {
