@@ -5,6 +5,7 @@ import { summarizeScreenshot, generateEmailFromContext, generateCalendarFromCont
 import { getRandomEmailScenario, getRandomCalendarScenario, getEmailScenarioById, getCalendarScenarioById } from '../data/mockScenarios';
 import monitorRouter from './monitor';
 import contextRouter from './context';
+import chatRouter from './chat';
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.get('/python', (req, res) => {
 
 router.use('/monitor', monitorRouter);
 router.use('/context', contextRouter);
+router.use('/chat', chatRouter);
 
 router.post('/generate-email', async (req, res) => {
   try {
