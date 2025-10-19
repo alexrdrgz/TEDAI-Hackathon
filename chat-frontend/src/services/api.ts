@@ -157,3 +157,89 @@ export function startPolling(
   };
 }
 
+/**
+ * Check voice service status
+ */
+export async function getVoiceStatus(): Promise<{ available: boolean; message: string }> {
+  const response = await axios.get(`${API_BASE_URL}/voice/status`);
+  if (response.data.success) {
+    return {
+      available: response.data.available,
+      message: response.data.message,
+    };
+  }
+  throw new Error('Failed to check voice status');
+}
+
+/**
+ * Transcribe audio to text
+ */
+export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+  const formData = new FormData();
+  formData.append('audio', audioBlob);
+
+  const response = await axios.post(`${API_BASE_URL}/voice/transcribe`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  if (response.data.success) {
+    return response.data.text;
+  }
+  throw new Error(response.data.error || 'Failed to transcribe audio');
+}
+
+/**
+ * Convert text to speech
+ */
+export async function textToSpeech(text: string): Promise<Blob> {
+  const response = await axios.post(
+    `${API_BASE_URL}/voice/speak`,
+    { text },
+    {
+      responseType: 'blob',
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Send voice message and get AI response (combined endpoint)
+ */
+export async function sendVoiceMessage(
+  sessionId: string,
+  audioBlob: Blob
+): Promise<{
+  transcription: string;
+  response: string;
+  user_message_id: number;
+  assistant_message_id: number;
+  audio: string; // base64 encoded audio
+}> {
+  const formData = new FormData();
+  formData.append('audio', audioBlob);
+
+  const response = await axios.post(
+    `${API_BASE_URL}/voice/session/${sessionId}/message`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+
+  if (response.data.success) {
+    return {
+      transcription: response.data.transcription,
+      response: response.data.response,
+      user_message_id: response.data.user_message_id,
+      assistant_message_id: response.data.assistant_message_id,
+      audio: response.data.audio,
+    };
+  }
+  throw new Error(response.data.error || 'Failed to send voice message');
+}
+
