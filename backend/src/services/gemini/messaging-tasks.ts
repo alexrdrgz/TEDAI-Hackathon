@@ -58,27 +58,34 @@ Context:
 - Caption: ${caption}
 - Description: ${fullDescription}
 
-Your job is to identify action items from the visible messages and convert them into ACTIONABLE TASKS that can be executed through integrations:
+CRITICAL: Create ONLY ONE task - the MOST IMPORTANT and actionable item from the messages. Choose the highest priority action.
 
-1. **CALENDAR tasks** - For meeting requests, scheduling discussions, or time-based commitments
+Your job is to identify the SINGLE MOST IMPORTANT action item from the visible messages and convert it into an ACTIONABLE TASK that can be executed through integrations.
+
+PRIORITY ORDER (choose in this order):
+1. **CALENDAR tasks** (HIGHEST PRIORITY) - For meeting requests, scheduling discussions, or time-based commitments
    - Extract: title, description, startTime (ISO format), endTime, attendees (email addresses if visible), location
    - Example message: "Can we meet tomorrow at 2pm?" → calendar event
 
-2. **EMAIL tasks** - For requests to send information, follow-up communication, or replies needed
+2. **EMAIL tasks** (HIGH PRIORITY) - For requests to send information, follow-up communication, or replies needed
    - Extract: to (recipient email or name), subject, body (draft a professional response or email)
    - Example message: "Please send me the report" → draft email with report
 
-3. **REMINDER tasks** - For deadlines, follow-ups, tasks to complete, or things not to forget
+3. **REMINDER tasks** (LOWER PRIORITY) - For deadlines, follow-ups, tasks to complete, or things not to forget
    - Extract: title, description, remindAt (ISO timestamp)
    - Example message: "Don't forget the presentation deadline Monday" → reminder
    - Example message: "Can you review the document?" → reminder to review
+
+PRIORITIZATION RULES:
+- If there's ANY meeting or scheduling discussion → create ONLY a "calendar" task
+- If there's a clear email to send or reply → create ONLY an "email" task
+- Only create a "reminder" task if there's no calendar or email opportunity
 
 IMPORTANT GUIDELINES:
 - Only extract action items that are clearly actionable and relevant
 - For timestamps, use ISO 8601 format and make reasonable assumptions (e.g., "tomorrow at 2pm" → calculate actual datetime)
 - Use the current date context: ${new Date().toISOString()}
 - If sender information is visible, include it in the task data
-- If extracting multiple action items from one message, create separate tasks
 - Be selective - don't create tasks for casual conversation or informational messages
 - Include enough context in descriptions so the user understands what the task is about
 
@@ -128,7 +135,9 @@ If no actionable items are found, return an empty actionItems array.`;
 
     const parsed = JSON.parse(jsonMatch[0]);
     
-    return parsed.actionItems || [];
+    // Only return the first (most important) task to ensure 1 task per image
+    const actionItems = parsed.actionItems || [];
+    return actionItems.length > 0 ? [actionItems[0]] : [];
   });
 }
 

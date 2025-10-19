@@ -98,10 +98,19 @@ Current Activity:
 - Changes: ${changesText}
 ${isMessagingApp ? '- This is a MESSAGING APPLICATION - look for action items in messages' : ''}
 
-Consider these ACTIONABLE TASK TYPES (executable integrations):
-- "email": Draft communication via Gmail compose - use when the user should send an email or reply
-- "calendar": Create Google Calendar event - use for meetings, scheduling, time-based commitments
-- "reminder": Set Google Calendar reminder/task - use for deadlines, follow-ups, tasks to complete, things not to forget
+Analyze the screenshot and the timeline to decide if an actionable task should be created. Be somewhat careful not to generate suggestions needlessly, but do so when it seems relevant and helpful.
+
+IMPORTANT: Create ONLY ONE task per image. Choose the MOST IMPORTANT and actionable item.
+
+Consider these ACTIONABLE TASK TYPES in priority order (executable integrations):
+1. "calendar" (HIGHEST PRIORITY): Create Google Calendar event - use for meetings, scheduling, time-based commitments, appointments
+2. "email" (HIGH PRIORITY): Draft communication via Gmail compose - use when the user should send an email or reply
+3. "reminder" (LOWER PRIORITY): Set Google Calendar reminder/task - use for deadlines, follow-ups, tasks to complete, things not to forget
+
+PRIORITIZATION RULES:
+- If there's ANY meeting or scheduling discussion → create a "calendar" task
+- If there's a clear email to send or reply → create an "email" task
+- Only create a "reminder" task if there's no calendar or email opportunity
 
 If creating an EMAIL task, generate complete email data with to, subject, and body.
 If creating a CALENDAR task, generate event details including title, description, startTime, endTime, and attendees.

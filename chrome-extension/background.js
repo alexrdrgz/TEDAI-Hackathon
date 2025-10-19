@@ -148,6 +148,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
       return true; // Keep message channel open for async response
+    } else if (message.type === 'EDIT_TASK') {
+      console.log('[Background] Opening edit window for task:', message.taskId);
+      handleEditTask(message.taskId, message.taskData).then(() => {
+        sendResponse({ success: true });
+      }).catch(error => {
+        console.error('Error handling EDIT_TASK:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+      return true; // Keep message channel open for async response
     } else if (message.type === 'GET_TASKS') {
       handleGetTasks(sendResponse).catch(error => {
         console.error('Error handling GET_TASKS:', error);
@@ -189,8 +198,9 @@ async function handleAddTask(task) {
     const tasks = await getTasks();
     tasks.push({
       ...task,
-      id: generateTaskId(),
-      createdAt: new Date().toISOString(),
+      // Keep the original ID from the backend if it exists
+      id: task.id || generateTaskId(),
+      createdAt: task.createdAt || new Date().toISOString(),
       status: 'pending'
     });
     
@@ -235,6 +245,35 @@ async function handleUpdateTask(taskId, updates) {
     }
   } catch (error) {
     console.error('Failed to update task:', error);
+  }
+}
+
+// Handle edit task - opens chat window with task context
+async function handleEditTask(taskId, taskData) {
+  try {
+    console.log('[handleEditTask] Opening chat window for task:', taskId);
+    
+    // Store task data temporarily for retrieval by frontend
+    await chrome.storage.local.set({ [`editing_task_${taskId}`]: taskData });
+    
+    // Build URL with task context
+    const frontendUrl = 'http://localhost:3000';
+    const params = new URLSearchParams();
+    params.append('taskId', taskId);
+    params.append('taskType', taskData.type);
+    
+    const url = `${frontendUrl}?${params.toString()}`;
+    
+    // Open in new tab
+    await chrome.tabs.create({
+      url: url,
+      active: true
+    });
+    
+    console.log('[handleEditTask] Chat tab opened successfully');
+  } catch (error) {
+    console.error('[handleEditTask] Failed to open chat window:', error);
+    throw error;
   }
 }
 
