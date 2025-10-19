@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { ArrowUp, Mic, Plus, BarChart3, X } from "lucide-react"
+import { ArrowUp, Mic, Plus, BarChart3, X, Sparkles, MessageSquare } from "lucide-react"
 import { VoiceOrb } from "@/components/voice-orb"
 import { useSession } from "@/lib/session-context"
 import { useVoiceMode } from "@/hooks/useVoiceMode"
@@ -200,7 +200,8 @@ export function ChatInterface() {
       {/* Sidebar */}
       <div className="w-64 border-r border-border bg-card flex flex-col">
         <div className="p-4 border-b border-border">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Sparkles className="w-5 h-5" />
             Context AI
           </h1>
         </div>
@@ -208,17 +209,17 @@ export function ChatInterface() {
         <div className="flex-1 overflow-y-auto p-2">
           <Button
             onClick={createNewSession}
-            className="w-full mb-4 bg-primary hover:bg-primary/90 transition-all duration-200"
+            className="w-full mb-4 bg-primary/80 hover:bg-primary transition-all duration-200 justify-start text-base font-medium gap-2"
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4" />
             New Chat
           </Button>
 
           <div className="space-y-1">
             <button
-              className="w-full text-left px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 bg-primary/20 text-primary border border-primary/30"
+              className="w-full text-left px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 bg-[#4493F8]/20 text-[#4493F8] border border-[#4493F8]/30 text-base font-medium"
             >
-              <span className="text-lg">💬</span>
+              <MessageSquare className="w-4 h-4" />
               <span className="truncate">Current Chat</span>
             </button>
           </div>
@@ -285,7 +286,7 @@ export function ChatInterface() {
                         message.role === "user" ? "bg-primary text-primary-foreground" : "bg-card border-border"
                       )}
                     >
-                      <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-base leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
                     </Card>
                   </div>
                 ))
