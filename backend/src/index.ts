@@ -63,6 +63,6 @@ app.use('/api', routes);
     });
   } catch (err) {
     console.error('Failed to initialize database:', err);
-    process.exit(1);
+    throw err;
   }
 })();
