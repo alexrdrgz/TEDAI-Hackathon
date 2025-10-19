@@ -4,6 +4,18 @@ import cors from 'cors';
 import routes from './routes';
 import { initDatabase } from './services/db';
 import { initializeTools } from './services/tools';
+import { execSync } from 'child_process';
+
+// Suppress 404 request logging to reduce console noise
+const originalLog = console.log;
+console.log = function(...args: any[]) {
+  const message = args.join(' ');
+  // Filter out 404 and poll request logs
+  if (message.includes('404') || (message.includes('GET') && message.includes('poll'))) {
+    return;
+  }
+  return originalLog.apply(console, args);
+};
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -61,30 +73,75 @@ app.use((err: any, req: any, res: any, next: any) => {
 
 app.use('/api', routes);
 
-(async () => {
+// Initialize database and tools
+initDatabase().catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
+});
+
+try {
+  initializeTools();
+} catch (toolErr) {
+  console.error('Failed to initialize tools:', toolErr);
+  process.exit(1);
+}
+
+let server: any;
+
+function freePort(port: number | string) {
   try {
-    await initDatabase();
+    // Try to kill any process listening on the port (Linux/macOS)
+    execSync(`lsof -ti tcp:${port} | xargs -r kill -9`, { stdio: 'ignore' });
+    console.log(`⚠️  Freed processes using port ${port}`);
+  } catch {
+    // Ignore if lsof/xargs not available; fallback attempt with fuser
     try {
-      initializeTools();
-    } catch (toolErr) {
-      console.error('Failed to initialize tools:', toolErr);
-      throw toolErr;
+      execSync(`fuser -k ${port}/tcp`, { stdio: 'ignore' });
+      console.log(`⚠️  Freed processes using port ${port} (fuser)`);
+    } catch {
+      // No-op if nothing to kill
     }
-    const server = app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-    server.on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use. Please stop the process using that port.`);
-        console.error(`💡 Suggestion: Change PORT in your .env file to 3001, 3002, 4000, or 8000`);
-        process.exit(1);
-      } else {
-        console.error('❌ Failed to start server:', err);
-        throw err;
-      }
-    });
-  } catch (err) {
-    console.error('Failed to initialize database:', err);
-    throw err;
   }
-})();
+}
+
+function startServer() {
+  server = app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use. Attempting to free it...`);
+      freePort(PORT);
+      setTimeout(() => {
+        console.log('🔁 Retrying server start...');
+        startServer();
+      }, 300);
+      return;
+    }
+    console.error('Server error:', err);
+    process.exit(1);
+  });
+}
+
+// Proactively free the port on startup to avoid intermittent conflicts
+freePort(PORT);
+startServer();
+
+// Ensure the server closes cleanly so the port is freed on reload/exit
+process.once('SIGUSR2', () => {
+  console.log('♻️  Received SIGUSR2 (nodemon). Restarting server...');
+  server.close(() => {
+    process.kill(process.pid, 'SIGUSR2');
+  });
+});
+
+process.on('SIGTERM', () => {
+  console.log('🛑 Received SIGTERM. Shutting down server...');
+  server.close(() => process.exit(0));
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 Received SIGINT (Ctrl+C). Shutting down server...');
+  server.close(() => process.exit(0));
+});

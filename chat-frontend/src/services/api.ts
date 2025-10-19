@@ -86,8 +86,16 @@ export async function pollMessages(
     const response = await axios.get(`${API_BASE_URL}/chat/session/${sessionId}/poll`, {
       params: { lastMessageId },
       signal,
-      timeout: 35000 // Slightly longer than server timeout
+      timeout: 35000, // Slightly longer than server timeout
+      validateStatus: (status) => status < 500 // Don't throw on 4xx status
     });
+    
+    // Check if response is not success or is 404 (session doesn't exist)
+    if (response.status === 404) {
+      // Silently return empty - session doesn't exist yet or was deleted
+      return [];
+    }
+    
     if (response.data.success) {
       return response.data.messages;
     }
@@ -98,7 +106,7 @@ export async function pollMessages(
       return [];
     }
     // On timeout or error, return empty array and let caller retry
-    console.warn('Polling error:', error.message);
+    // Suppress logging for polling (it's expected to timeout occasionally)
     return [];
   }
 }
@@ -241,5 +249,33 @@ export async function sendVoiceMessage(
     };
   }
   throw new Error(response.data.error || 'Failed to send voice message');
+}
+
+/**
+ * Get timeline snapshots for a session
+ */
+export interface Snapshot {
+  screenshot_path: string;
+  caption: string;
+  full_description: string;
+  changes: string[];
+  facts: string[];
+  created_at: string;
+}
+
+export async function getTimelineSnapshots(sessionId: string): Promise<Snapshot[]> {
+  const response = await axios.get(`${API_BASE_URL}/monitor/timeline/${sessionId}`);
+  if (response.data.success) {
+    return response.data.snapshots;
+  }
+  throw new Error('Failed to fetch timeline snapshots');
+}
+
+export async function getAllSnapshots(): Promise<Snapshot[]> {
+  const response = await axios.get(`${API_BASE_URL}/monitor/timeline`);
+  if (response.data.success) {
+    return response.data.snapshots;
+  }
+  throw new Error('Failed to fetch all snapshots');
 }
 

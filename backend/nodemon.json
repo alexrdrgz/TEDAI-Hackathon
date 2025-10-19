@@ -1,0 +1,7 @@
+{
+  "watch": ["src"],
+  "ignore": ["node_modules", "dist", "venv", "speech_service/venv", "data"],
+  "ext": "ts,json",
+  "exec": "ts-node src/index.ts",
+  "delay": 500
+}
