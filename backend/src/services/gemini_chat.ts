@@ -1,6 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { db } from './db';
+import { getSessionTimeline } from './timeline';
 
 dotenv.config();
 
@@ -80,14 +81,18 @@ async function getSessionContext(sessionId: string): Promise<SessionContext> {
 /**
  * Build context-aware system prompt
  */
-function buildSystemPrompt(context: SessionContext): string {
+async function buildSystemPrompt(context: SessionContext): Promise<string> {
+  const sessionTimeline = await getSessionTimeline('0');
   let systemPrompt = `You are a helpful AI assistant with access to the user's recent computer activity. You can provide smart suggestions and help with tasks based on what the user is working on.
 
 Your responses should be:
 - Concise and helpful
 - Context-aware based on screen activity
 - Proactive in suggesting relevant actions
-- Professional but friendly`;
+- Professional but friendly
+Full history of the session:
+${sessionTimeline}
+`;
 
   if (context.snapshots.length > 0) {
     systemPrompt += `\n\nRecent Screen Activity:\n`;
@@ -129,7 +134,7 @@ export async function generateChatResponse(
       }
     }
 
-    const systemPrompt = buildSystemPrompt(context);
+    const systemPrompt = await buildSystemPrompt(context);
 
     // Convert chat messages to Gemini format
     const contents = messages.map((msg) => ({
