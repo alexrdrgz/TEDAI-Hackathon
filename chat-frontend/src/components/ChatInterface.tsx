@@ -144,7 +144,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ sessionId }) => {
         for (let i = 0; i < audioBytes.length; i++) {
           audioArray[i] = audioBytes.charCodeAt(i);
         }
-        const responseAudioBlob = new Blob([audioArray], { type: 'audio/wav' });
+        const responseAudioBlob = new Blob([audioArray.buffer], { type: 'audio/wav' });
 
         // Play AI response
         await voice.playAudio(responseAudioBlob);
