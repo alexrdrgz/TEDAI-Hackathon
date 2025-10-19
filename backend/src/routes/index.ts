@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
-import { getPendingTasks, markTaskAsHandled } from '../services/db';
+import { createTask, getPendingTasks, markTaskAsHandled, getTaskById, updateTask, deleteTask } from '../services/db';
 import monitorRouter from './monitor';
 import contextRouter from './context';
 import chatRouter from './chat';
@@ -58,6 +58,61 @@ router.post('/tasks/:id/handled', async (req, res) => {
   } catch (error) {
     console.error('Error marking task as handled:', error);
     res.status(500).json({ error: 'Failed to mark task as handled' });
+  }
+});
+
+router.get('/tasks/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const task = await getTaskById(id);
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+    res.json({ success: true, task });
+  } catch (error) {
+    console.error('Error fetching task:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch task' });
+  }
+});
+
+router.put('/tasks/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, data } = req.body;
+    
+    if (!type || !data) {
+      return res.status(400).json({ success: false, error: 'Type and data are required' });
+    }
+    
+    // Check if task exists
+    const existingTask = await getTaskById(id);
+    if (!existingTask) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+    
+    await updateTask(id, type, data);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating task:', error);
+    res.status(500).json({ success: false, error: 'Failed to update task' });
+  }
+});
+
+router.delete('/tasks/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if task exists
+    const existingTask = await getTaskById(id);
+    if (!existingTask) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+    
+    await deleteTask(id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete task' });
   }
 });
 

@@ -419,6 +419,16 @@ function createStickyButton() {
         background: #F85149;
       }
 
+      .tedai-notification-btn-edit {
+        background: #238636;
+        color: #F0F6FC;
+      }
+
+      .tedai-notification-btn-edit:hover {
+        background: #2EA043;
+        transform: translateY(-1px);
+      }
+
       /* Swipeable container */
       .tedai-notification-swipeable {
         position: relative;
@@ -465,6 +475,16 @@ function createStickyButton() {
 
       .tedai-queue-reject-btn:hover {
         background: #F85149;
+        transform: scale(1.1);
+      }
+
+      .tedai-queue-edit-btn {
+        background: #238636;
+        color: #F0F6FC;
+      }
+
+      .tedai-queue-edit-btn:hover {
+        background: #2EA043;
         transform: scale(1.1);
       }
 
@@ -559,6 +579,7 @@ function showNotification(taskData) {
       </div>
       <div class="tedai-notification-actions">
         <button class="tedai-notification-btn tedai-notification-btn-primary tedai-approve-btn">✓ Approve</button>
+        <button class="tedai-notification-btn tedai-notification-btn-edit tedai-edit-btn">✎ Edit</button>
         <button class="tedai-notification-btn tedai-notification-btn-secondary tedai-reject-btn">✗ Reject</button>
       </div>
     </div>
@@ -606,6 +627,11 @@ function showNotification(taskData) {
   notificationContent.querySelector('.tedai-approve-btn').addEventListener('click', (e) => {
     e.stopPropagation();
     approveTask(taskData.id);
+  });
+
+  notificationContent.querySelector('.tedai-edit-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    editTask(taskData.id, taskData);
   });
 
   notificationContent.querySelector('.tedai-reject-btn').addEventListener('click', (e) => {
@@ -745,6 +771,7 @@ function renderQueueView(tasks) {
           <div class="tedai-queue-item-summary">${summary}</div>
           <div class="tedai-queue-item-actions">
             <button class="tedai-queue-action-btn tedai-queue-approve-btn" data-task-id="${task.id}">✓</button>
+            <button class="tedai-queue-action-btn tedai-queue-edit-btn" data-task-id="${task.id}">✎</button>
             <button class="tedai-queue-action-btn tedai-queue-reject-btn" data-task-id="${task.id}">✗</button>
           </div>
         </div>
@@ -812,6 +839,17 @@ function renderQueueView(tasks) {
         e.stopPropagation();
         const taskId = e.target.dataset.taskId;
         rejectTask(taskId);
+      });
+    });
+
+    queueContent.querySelectorAll('.tedai-queue-edit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const taskId = e.target.dataset.taskId;
+        const task = tasks.find(t => t.id === taskId);
+        if (task) {
+          editTask(taskId, task);
+        }
       });
     });
   }
@@ -927,6 +965,30 @@ function rejectTask(taskId) {
   
   if (!sent) {
     console.error('[StickyButton] Failed to send reject message - extension context may be invalid');
+  }
+}
+
+// Edit task
+function editTask(taskId, taskData) {
+  console.log('[StickyButton] Opening edit window for task:', taskId);
+  
+  // Send message to background script to open chat window
+  const sent = safeSendMessage({ 
+    type: 'EDIT_TASK', 
+    taskId: taskId,
+    taskData: taskData
+  }, (response) => {
+    if (response && response.success) {
+      console.log('[StickyButton] Edit window opened successfully');
+      // Collapse the notification after opening edit window
+      requestTaskCountAndCollapse();
+    } else {
+      console.error('[StickyButton] Failed to open edit window:', response);
+    }
+  });
+  
+  if (!sent) {
+    console.error('[StickyButton] Failed to send edit message - extension context may be invalid');
   }
 }
 

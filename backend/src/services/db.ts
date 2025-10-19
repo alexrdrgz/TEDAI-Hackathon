@@ -142,3 +142,51 @@ export function markTaskAsHandled(id: string): Promise<void> {
     );
   });
 }
+
+export function getTaskById(id: string): Promise<any | null> {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT * FROM tasks WHERE id = ?`,
+      [id],
+      (err: Error | null, row: any) => {
+        if (err) reject(err);
+        else if (!row) resolve(null);
+        else {
+          resolve({
+            id: row.id,
+            type: row.type,
+            data: JSON.parse(row.data),
+            status: row.status,
+            createdAt: row.created_at
+          });
+        }
+      }
+    );
+  });
+}
+
+export function updateTask(id: string, type: string, data: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE tasks SET type = ?, data = ? WHERE id = ?`,
+      [type, JSON.stringify(data), id],
+      (err: Error | null) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+export function deleteTask(id: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `DELETE FROM tasks WHERE id = ?`,
+      [id],
+      (err: Error | null) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}

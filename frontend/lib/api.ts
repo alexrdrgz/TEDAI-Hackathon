@@ -60,7 +60,7 @@ export async function getMessages(sessionId: string, limit: number = 50): Promis
   if (data.success) {
     return data.messages;
   }
-  throw new Error('Failed to fetch messages');
+  throw new Error(data.error || 'Failed to fetch messages');
 }
 
 /**
@@ -224,4 +224,52 @@ export async function getAllSnapshots(): Promise<Snapshot[]> {
     return data.snapshots;
   }
   throw new Error('Failed to fetch all snapshots');
+}
+
+export interface Task {
+  id: string;
+  type: 'email' | 'calendar' | 'reminder';
+  data: any;
+  status: string;
+  createdAt: string;
+}
+
+/**
+ * Get a specific task by ID
+ */
+export async function getTask(taskId: string): Promise<Task> {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`);
+  const data = await response.json();
+  if (data.success) {
+    return data.task;
+  }
+  throw new Error(data.error || 'Failed to fetch task');
+}
+
+/**
+ * Update a task
+ */
+export async function updateTask(taskId: string, type: string, taskData: any): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, data: taskData }),
+  });
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to update task');
+  }
+}
+
+/**
+ * Delete a task
+ */
+export async function deleteTask(taskId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+    method: 'DELETE',
+  });
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to delete task');
+  }
 }
