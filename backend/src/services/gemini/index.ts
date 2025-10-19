@@ -16,3 +16,6 @@ export { generateEmailFromContext, generateCalendarFromContext } from './task-te
 
 // Chat responses
 export { generateChatResponse } from './chat';
+
+// Time summary
+export { generateTimeSummary } from './time-summary';

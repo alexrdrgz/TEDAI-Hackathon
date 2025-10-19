@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
+
 interface TimelineMonitorProps {
   sessionId?: string
 }
@@ -90,19 +92,21 @@ export function TimelineMonitor({ sessionId }: TimelineMonitorProps) {
       {/* Timeline Track */}
       <Card className="p-6 bg-card border-border">
         <h3 className="text-lg font-semibold mb-6">Activity Timeline</h3>
-        <div className="relative">
+        <div className="relative px-4 py-8">
           {/* Timeline line */}
-          <div className="absolute left-0 top-1/2 right-0 h-1 bg-gradient-to-r from-primary via-accent to-primary/20" />
+          <div className="absolute left-4 right-4 top-8 h-1 bg-gradient-to-r from-primary via-accent to-primary/20" />
 
           {/* Timeline events */}
-          <div className="relative flex items-center justify-between gap-2 px-4">
+          <div className="relative h-16">
             {snapshots.map((snapshot, index) => {
               const isSelected = selectedIndex === index
+              const position = getTimePosition(snapshot.created_at)
               return (
                 <button
                   key={index}
                   onClick={() => setSelectedIndex(index)}
-                  className="group relative flex flex-col items-center gap-2"
+                  className="group absolute flex flex-col items-center gap-2 -translate-x-1/2"
+                  style={{ left: `${position}%` }}
                   title={snapshot.caption}
                 >
                   {/* Timeline dot */}
@@ -127,8 +131,11 @@ export function TimelineMonitor({ sessionId }: TimelineMonitorProps) {
       {/* Detail View */}
       {selected ? (
         <Card className="p-6 bg-card border-border space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">{selected.caption}</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-xl font-semibold">{selected.caption}</h3>
+              <p className="text-xs text-muted-foreground mt-1">{new Date(selected.created_at).toLocaleString()}</p>
+            </div>
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -147,59 +154,51 @@ export function TimelineMonitor({ sessionId }: TimelineMonitorProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Screenshot */}
-            <div className="lg:col-span-1 flex flex-col items-center">
-              <div className="w-full bg-secondary rounded-lg overflow-hidden border border-border">
-                <img
-                  src={`/api/monitor/screenshot/${getScreenshotFilename(selected.screenshot_path)}`}
-                  alt="Screenshot"
-                  className="w-full h-auto"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none"
-                  }}
-                />
+          {/* Screenshot - Full Width */}
+          <div className="w-full bg-secondary rounded-lg overflow-hidden border border-border min-h-[400px] flex items-center justify-center">
+            <img
+              src={`${API_BASE_URL}/monitor/screenshot/${getScreenshotFilename(selected.screenshot_path)}`}
+              alt="Screenshot"
+              className="max-w-full max-h-[600px] object-contain"
+            />
+          </div>
+
+          {/* Info Grid - Below Screenshot */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+            {selected.full_description && (
+              <div className="md:col-span-3">
+                <h4 className="font-semibold mb-2 text-sm uppercase tracking-wide text-muted-foreground">Description</h4>
+                <p className="text-sm text-foreground leading-relaxed">{selected.full_description}</p>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">{new Date(selected.created_at).toLocaleString()}</p>
-            </div>
+            )}
 
-            {/* Info */}
-            <div className="lg:col-span-2 space-y-4">
-              {selected.full_description && (
-                <div>
-                  <h4 className="font-semibold mb-2">Description</h4>
-                  <p className="text-sm text-foreground/80 leading-relaxed">{selected.full_description}</p>
-                </div>
-              )}
+            {selected.changes && selected.changes.length > 0 && (
+              <div className="md:col-span-2">
+                <h4 className="font-semibold mb-2 text-sm uppercase tracking-wide text-muted-foreground">Changes</h4>
+                <ul className="text-sm space-y-2 text-foreground/90">
+                  {selected.changes.map((change, i) => (
+                    <li key={i} className="flex gap-2 items-start">
+                      <span className="text-accent mt-0.5 flex-shrink-0">→</span>
+                      <span>{change}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-              {selected.facts && selected.facts.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Facts</h4>
-                  <ul className="text-sm space-y-1 text-foreground/80">
-                    {selected.facts.map((fact, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-primary">•</span>
-                        {fact}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {selected.changes && selected.changes.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Changes</h4>
-                  <ul className="text-sm space-y-1 text-foreground/80">
-                    {selected.changes.map((change, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-accent">→</span>
-                        {change}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+            {selected.facts && selected.facts.length > 0 && (
+              <div className={selected.changes && selected.changes.length > 0 ? "md:col-span-1" : "md:col-span-3"}>
+                <h4 className="font-semibold mb-2 text-sm uppercase tracking-wide text-muted-foreground">Facts</h4>
+                <ul className="text-sm space-y-2 text-foreground/90">
+                  {selected.facts.map((fact, i) => (
+                    <li key={i} className="flex gap-2 items-start">
+                      <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                      <span>{fact}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </Card>
       ) : (

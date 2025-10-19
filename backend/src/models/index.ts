@@ -23,3 +23,19 @@ export const TimelineEntryDataSchema = z.object({
 });
 
 export type TimelineEntryData = z.infer<typeof TimelineEntryDataSchema>;
+
+export const TimeCategorySchema = z.object({
+  category: z.string().describe('The activity category (e.g., "Coding", "Meetings", "Research", "Email")'),
+  description: z.string().describe('Brief description of what was done in this category'),
+  percentage: z.number().min(0).max(100).describe('Percentage of time spent (0-100)'),
+  duration: z.string().describe('Human-readable duration (e.g., "2 hours 30 minutes")'),
+});
+
+export const TimeSummarySchema = z.object({
+  categories: z.array(TimeCategorySchema).describe('Array of time categories, sorted by percentage descending'),
+  totalActivities: z.number().describe('Total number of activities tracked'),
+  summary: z.string().describe('A brief 1-2 sentence overall summary of how time was spent'),
+});
+
+export type TimeCategory = z.infer<typeof TimeCategorySchema>;
+export type TimeSummary = z.infer<typeof TimeSummarySchema>;
