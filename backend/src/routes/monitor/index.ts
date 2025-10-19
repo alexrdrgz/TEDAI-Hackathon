@@ -60,10 +60,8 @@ router.get('/screenshot', async (req, res) => {
           const filename = path.basename(filePath);
           await addSnapshot(filename, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
           
-          // Get current timeline for task generation
+          // Get current timeline and generate new entry
           const currentTimeline = await getSessionTimeline(sessionId);
-          
-          // Generate timeline entry and check for tasks in parallel
           const timestamp = new Date().toISOString();
           
           const [newEntry, taskCheckResult] = await Promise.all([
