@@ -7,7 +7,7 @@ import {
   sessionExists,
   getAllSessions
 } from '../../services/chat';
-import { generateChatResponse } from '../../services/gemini_chat';
+import { generateChatResponse } from '../../services/gemini';
 
 const router = Router();
 

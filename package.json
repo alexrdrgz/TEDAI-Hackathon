@@ -9,9 +9,13 @@
   ],
   "scripts": {
     "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd chat-frontend && npm run dev"
+    "dev:frontend": "cd chat-frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
   },
   "keywords": ["ai", "chat", "screen-monitoring", "hackathon"],
-  "author": "",
-  "license": "ISC"
+  "author": "TEDAI",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^9.1.2"
+  }
 }

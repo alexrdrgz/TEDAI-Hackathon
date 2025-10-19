@@ -1,11 +1,10 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { db } from './db';
-import { getSessionTimeline } from './timeline';
+import { db } from '../db';
+import { getSessionTimeline } from '../timeline';
 
 dotenv.config();
 
-// Fail fast if API key is not configured
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
   console.error('❌ FATAL ERROR: GEMINI_API_KEY environment variable is not set');
@@ -34,12 +33,8 @@ interface SessionContext {
   }>;
 }
 
-/**
- * Fetch recent screen monitoring context for a session
- */
 async function getSessionContext(sessionId: string): Promise<SessionContext> {
   return new Promise((resolve, reject) => {
-    // Get recent snapshots (last 5)
     db.all(
       `SELECT caption, full_description, facts, created_at 
        FROM snapshots 
@@ -53,7 +48,6 @@ async function getSessionContext(sessionId: string): Promise<SessionContext> {
           return;
         }
 
-        // Get recent timeline entries (last 5)
         db.all(
           `SELECT text, caption, timestamp 
            FROM timeline_entries 
@@ -78,9 +72,6 @@ async function getSessionContext(sessionId: string): Promise<SessionContext> {
   });
 }
 
-/**
- * Build context-aware system prompt
- */
 async function buildSystemPrompt(context: SessionContext): Promise<string> {
   const sessionTimeline = await getSessionTimeline('0');
   let systemPrompt = `You are a helpful AI assistant with access to the user's recent computer activity. You can provide smart suggestions and help with tasks based on what the user is working on.
@@ -115,28 +106,22 @@ ${sessionTimeline}
   return systemPrompt;
 }
 
-/**
- * Generate chat response using Gemini API with conversation history and context
- */
 export async function generateChatResponse(
   messages: ChatMessage[],
   sessionId?: string
 ): Promise<string> {
   try {
-    // Get session context if sessionId provided
     let context: SessionContext = { snapshots: [], timeline: [] };
     if (sessionId) {
       try {
         context = await getSessionContext(sessionId);
       } catch (err) {
         console.error('Error fetching session context:', err);
-        // Continue without context
       }
     }
 
     const systemPrompt = await buildSystemPrompt(context);
 
-    // Convert chat messages to Gemini format
     const contents = messages.map((msg) => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: msg.content }]
@@ -160,11 +145,11 @@ export async function generateChatResponse(
         params: {
           key: GEMINI_API_KEY
         },
-        timeout: 30000, // 30 second timeout
+        timeout: 30000,
         headers: {
           'Content-Type': 'application/json'
         },
-        proxy: false // Explicitly disable proxy to avoid corporate firewall issues
+        proxy: false
       }
     );
 
@@ -180,4 +165,3 @@ export async function generateChatResponse(
     throw new Error('Failed to generate chat response');
   }
 }
-
