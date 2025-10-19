@@ -47,10 +47,11 @@ export async function summarizeScreenshot(
     });
 
     let prompt = `Analyze this screenshot and provide:
-1. FullDescription: A 1 paragraph explanation of what is visible
+1. FullDescription: A 1 paragraph explanation of what is visible. If this is a messaging application, include details about visible message content, senders, and conversation context.
 2. Caption: A 1 sentence summary of the image, focusing on which task the user is performing
 3. Changes: An array of short snippets of what changed (if there's a previous screenshot context, compare; if not, use empty array)
 4. Facts: An array of 0-3 facts that can be learned from the screenshot
+5. isMessagingApp: Boolean true if this screenshot shows a messaging/chat application (look for chat bubbles, message threads, conversation interfaces like Slack, WhatsApp, iMessage, Discord, Teams, Telegram, etc.), false otherwise
 
 Return a JSON object with these exact keys.`;
 
