@@ -101,8 +101,8 @@ async function monitorAndScreenshot(): Promise<void> {
       let shouldTakeScreenshot = false;
       
       // Heuristic logic
-      if (percentDifferent > 15 && timeSinceLastScreenshot >= 10000) {
-        // More than 15% different and at least 10 seconds have passed
+      if (percentDifferent > 15 && timeSinceLastScreenshot >= 5000) {
+        // More than 15% different and at least 5 seconds have passed
         shouldTakeScreenshot = true;
       } else if (percentDifferent > 10 && timeSinceLastScreenshot >= 30000) {
         // More than 10% different and at least 30 seconds have passed
