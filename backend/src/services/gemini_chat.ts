@@ -4,7 +4,14 @@ import { db } from './db';
 
 dotenv.config();
 
+// Fail fast if API key is not configured
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  console.error('❌ FATAL ERROR: GEMINI_API_KEY environment variable is not set');
+  console.error('   Please add GEMINI_API_KEY to your backend/.env file');
+  throw new Error('GEMINI_API_KEY is required but not configured');
+}
+
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 interface ChatMessage {
@@ -125,19 +132,17 @@ export async function generateChatResponse(
     const systemPrompt = buildSystemPrompt(context);
 
     // Convert chat messages to Gemini format
-    const contents = [
-      {
-        parts: [{ text: systemPrompt }]
-      },
-      ...messages.map((msg) => ({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
-      }))
-    ];
+    const contents = messages.map((msg) => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
 
     const response = await axios.post(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+      GEMINI_API_URL,
       {
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
         contents,
         generationConfig: {
           temperature: 0.7,
@@ -145,6 +150,16 @@ export async function generateChatResponse(
           topP: 0.95,
           maxOutputTokens: 1024,
         }
+      },
+      {
+        params: {
+          key: GEMINI_API_KEY
+        },
+        timeout: 30000, // 30 second timeout
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        proxy: false // Explicitly disable proxy to avoid corporate firewall issues
       }
     );
 

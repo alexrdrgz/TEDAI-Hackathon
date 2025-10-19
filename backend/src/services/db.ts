@@ -12,6 +12,9 @@ if (!fs.existsSync(dbDir)) {
 
 export const db = new sqlite3.Database(dbPath);
 
+// Enable foreign key constraints in SQLite
+db.run('PRAGMA foreign_keys = ON');
+
 export function initDatabase(): Promise<void> {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
@@ -58,7 +61,7 @@ export function initDatabase(): Promise<void> {
                             role TEXT NOT NULL,
                             content TEXT NOT NULL,
                             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id)
+                            FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id) ON DELETE CASCADE
                           )`,
                           (err: Error | null) => {
                             if (err) reject(err);
