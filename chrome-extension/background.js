@@ -1,6 +1,9 @@
 // Background service worker for TEDAI Chrome Extension
 console.log('TEDAI AI Agent background script loaded');
 
+// Load configuration
+importScripts('config.js');
+
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('TEDAI AI Agent installed:', details.reason);
 });
@@ -149,8 +152,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // Poll for tasks from server
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = CONFIG.API_BASE_URL;
 let pollingInterval = null;
+
+console.log('Using API Base URL:', API_BASE_URL);
 
 async function pollForTasks() {
   try {
@@ -189,7 +194,7 @@ function startPolling() {
   if (pollingInterval) return;
   
   // Disable polling for now to avoid CORS issues
-  console.log('Polling disabled - tasks will be managed locally');
+  console.log('Polling disabled for now to avoid CORS issues');
   return;
   
   pollingInterval = setInterval(pollForTasks, 500);
