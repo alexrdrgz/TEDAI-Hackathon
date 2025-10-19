@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { transcribeAudio, textToSpeech, isVoiceServiceAvailable, getAvailableVoices } from '../../services/voice';
+import { textToSpeech, isVoiceServiceAvailable, getAvailableVoices, transcribeAudio } from '../../services/voice';
 import { saveMessage, sessionExists, getSessionHistory } from '../../services/chat';
 import { generateChatResponse } from '../../services/gemini';
 
@@ -33,8 +33,8 @@ router.get('/status', (req, res) => {
     success: true,
     available,
     message: available
-      ? 'Local voice services are available (Faster Whisper + pyttsx3)'
-      : 'Voice services not configured. Run setup.sh in backend/speech_service directory.',
+      ? 'Voice services are available (Google Cloud TTS)'
+      : 'Voice services not configured. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.',
   });
 });
 
@@ -65,18 +65,10 @@ router.get('/voices', async (req, res) => {
 
 /**
  * POST /api/voice/transcribe
- * Transcribe audio to text
+ * Transcribe audio to text using Gemini
  */
 router.post('/transcribe', upload.single('audio') as any, async (req, res) => {
   try {
-    if (!isVoiceServiceAvailable()) {
-      res.status(503).json({
-        success: false,
-        error: 'Voice services not available. Please configure Google Cloud credentials.',
-      });
-      return;
-    }
-
     if (!req.file) {
       res.status(400).json({
         success: false,
@@ -88,7 +80,15 @@ router.post('/transcribe', upload.single('audio') as any, async (req, res) => {
     const audioBuffer = req.file.buffer;
     const mimeType = req.file.mimetype;
 
-    const transcription = await transcribeAudio(audioBuffer, mimeType);
+    // Use Gemini to transcribe audio
+    const transcription = await generateChatResponse([
+      {
+        role: 'user',
+        content: 'Please transcribe this audio exactly as spoken.',
+        audioBuffer,
+        audioMimeType: mimeType,
+      } as any
+    ]);
 
     res.json({
       success: true,
@@ -112,7 +112,7 @@ router.post('/speak', async (req, res) => {
     if (!isVoiceServiceAvailable()) {
       res.status(503).json({
         success: false,
-        error: 'Voice services not available. Please configure Google Cloud credentials.',
+        error: 'Voice services not available.',
       });
       return;
     }
@@ -137,7 +137,7 @@ router.post('/speak', async (req, res) => {
 
     const audioBuffer = await textToSpeech(text);
 
-    // Set headers for audio response (pyttsx3 outputs WAV format)
+    // Set headers for audio response (Gemini TTS outputs audio)
     res.setHeader('Content-Type', 'audio/wav');
     res.setHeader('Content-Length', audioBuffer.length);
     res.send(audioBuffer);
@@ -152,14 +152,14 @@ router.post('/speak', async (req, res) => {
 
 /**
  * POST /api/voice/session/:sessionId/message
- * Combined endpoint: transcribe audio, generate AI response, convert to speech
+ * Combined endpoint: send audio to AI, generate response, convert to speech
  */
 router.post('/session/:sessionId/message', upload.single('audio') as any, async (req, res) => {
   try {
     if (!isVoiceServiceAvailable()) {
       res.status(503).json({
         success: false,
-        error: 'Voice services not available. Please configure Google Cloud credentials.',
+        error: 'Voice services not available.',
       });
       return;
     }
@@ -184,34 +184,46 @@ router.post('/session/:sessionId/message', upload.single('audio') as any, async 
       return;
     }
 
-    // 1. Transcribe audio
+    // 1. Get audio buffer
     const audioBuffer = req.file.buffer;
     const mimeType = req.file.mimetype;
-    const transcription = await transcribeAudio(audioBuffer, mimeType);
 
-    // 2. Save user message
-    const userMessageId = await saveMessage(sessionId, 'user', transcription);
-
-    // 3. Get conversation history
+    // 2. Get conversation history
     const history = await getSessionHistory(sessionId);
     const conversationMessages = history.map(msg => ({
       role: msg.role,
       content: msg.content,
     }));
 
-    // 4. Generate AI response
-    const aiResponse = await generateChatResponse(conversationMessages, sessionId);
+    // 3. Add current audio message
+    conversationMessages.push({
+      role: 'user',
+      content: '',
+      audioBuffer,
+      audioMimeType: mimeType,
+    } as any);
 
-    // 5. Save AI response
+    // 4. Run transcription and AI response in parallel (both happen at same time!)
+    const [aiResponse, transcriptionText] = await Promise.all([
+      generateChatResponse(conversationMessages, sessionId, true),
+      transcribeAudio(audioBuffer, mimeType).catch((err: any) => {
+        console.warn('Failed to transcribe audio in background:', err.message);
+        return '[Audio message]';
+      })
+    ]);
+
+    // 5. Save user message once with transcription (or fallback)
+    const userMessageId = await saveMessage(sessionId, 'user', transcriptionText);
+
+    // 6. Save AI response
     const assistantMessageId = await saveMessage(sessionId, 'assistant', aiResponse);
 
-    // 6. Convert AI response to speech
+    // 7. Convert AI response to speech
     const audioResponse = await textToSpeech(aiResponse);
 
-    // 7. Return both text and audio
+    // 8. Return both text and audio
     res.json({
       success: true,
-      transcription,
       response: aiResponse,
       user_message_id: userMessageId,
       assistant_message_id: assistantMessageId,
@@ -227,4 +239,3 @@ router.post('/session/:sessionId/message', upload.single('audio') as any, async 
 });
 
 export default router;
-

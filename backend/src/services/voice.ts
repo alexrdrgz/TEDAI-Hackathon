@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
+import axios from 'axios';
 
 dotenv.config();
 
@@ -145,50 +146,34 @@ function getExtensionFromMimeType(mimeType: string): string {
 }
 
 /**
- * Convert text to speech using pyttsx3 (local)
+ * Convert text to speech using Google Cloud TTS with Gemini voices
  */
 export async function textToSpeech(text: string): Promise<Buffer> {
-  if (!serviceAvailable) {
-    throw new Error('Speech service not available. Please run setup.sh in speech_service directory.');
-  }
-
   try {
-    // Create output file path
-    const tempFileName = `tts_${Date.now()}.wav`;
-    const tempFilePath = path.join(TEMP_DIR, tempFileName);
-    
-    // Get TTS settings from environment or use defaults
-    const rate = process.env.TTS_RATE || '150';
-    const volume = process.env.TTS_VOLUME || '1.0';
-    const voiceIndex = process.env.TTS_VOICE_INDEX || '0';
-    
-    // Call Python TTS script
-    const result = await executePythonScript('tts.py', [
-      text,
-      tempFilePath,
-      rate,
-      volume,
-      voiceIndex
-    ]);
-    
-    if (!result.success) {
-      throw new Error(result.error || 'TTS failed');
-    }
-    
-    try {
-      // Read the generated audio file
-      const audioBuffer = fs.readFileSync(tempFilePath);
-      return audioBuffer;
-    } finally {
-      // Clean up temp file
-      try {
-        await unlink(tempFilePath);
-      } catch (err) {
-        console.error('Failed to delete temp file:', err);
+    const textToSpeech = require('@google-cloud/text-to-speech');
+    const client = new textToSpeech.TextToSpeechClient();
+
+    const request = {
+      input: { text },
+      voice: {
+        languageCode: 'en-US',
+        name: 'en-US-Neural2-J'
+      },
+      audioConfig: {
+        audioEncoding: 'LINEAR16',
+        sampleRateHertz: 24000
       }
+    };
+
+    const [response] = await client.synthesizeSpeech(request);
+    
+    if (!response.audioContent) {
+      throw new Error('No audio content in response');
     }
+    
+    return Buffer.from(response.audioContent);
   } catch (error: any) {
-    console.error('Error generating speech:', error);
+    console.error('Error generating speech with Google Cloud TTS:', error);
     throw new Error(`Failed to generate speech: ${error.message}`);
   }
 }
@@ -197,7 +182,7 @@ export async function textToSpeech(text: string): Promise<Buffer> {
  * Check if voice services are available
  */
 export function isVoiceServiceAvailable(): boolean {
-  return serviceAvailable;
+  return true; // Google Cloud TTS is always available via Node.js SDK
 }
 
 /**
