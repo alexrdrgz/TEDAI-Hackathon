@@ -78,23 +78,15 @@ class TaskQueueManager {
     }
 
     async addTestEmailTask() {
-        const testTask = {
-            type: 'email',
-            data: {
-                to: 'test@example.com',
-                subject: 'Test Email from TEDAI',
-                body: 'This is a test email created by the TEDAI AI Agent. Please review and approve if you want to send it.'
-            }
-        };
-
-        console.log('Adding test email task:', testTask);
-
+        console.log('Adding test email task via background script...');
+        
         try {
+            // Call the background script's test email function
+            console.log('Sending ADD_TEST_EMAIL_TASK message...');
             const response = await this.sendMessageToBackground({ 
-                type: 'ADD_TASK', 
-                task: testTask 
+                type: 'ADD_TEST_EMAIL_TASK'
             });
-            console.log('Add task response:', response);
+            console.log('Add test email task response:', response);
             
             await this.loadTasks();
             this.render();
@@ -108,6 +100,7 @@ class TaskQueueManager {
         
         try {
             // Call the background script's test calendar function
+            console.log('Sending ADD_TEST_CALENDAR_TASK message...');
             const response = await this.sendMessageToBackground({ 
                 type: 'ADD_TEST_CALENDAR_TASK'
             });

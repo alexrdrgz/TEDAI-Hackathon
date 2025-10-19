@@ -40,6 +40,7 @@ async function updateBadgeCount() {
 // Listen for messages to add tasks to queue
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Background received message:', message);
+  console.log('Message type:', message.type);
   
   try {
     if (message.type === 'ADD_TASK') {
@@ -58,8 +59,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
       return true; // Keep message channel open for async response
+    } else if (message.type === 'ADD_TEST_EMAIL_TASK') {
+      console.log('Handling ADD_TEST_EMAIL_TASK message...');
+      globalThis.addTestEmailTask().then(() => {
+        console.log('Email task added successfully');
+        sendResponse({ success: true });
+      }).catch(error => {
+        console.error('Error handling ADD_TEST_EMAIL_TASK:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+      return true; // Keep message channel open for async response
     } else if (message.type === 'ADD_TEST_CALENDAR_TASK') {
+      console.log('Handling ADD_TEST_CALENDAR_TASK message...');
       globalThis.addTestCalendarTask().then(() => {
+        console.log('Calendar task added successfully');
         sendResponse({ success: true });
       }).catch(error => {
         console.error('Error handling ADD_TEST_CALENDAR_TASK:', error);
@@ -135,12 +148,60 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-// Initialize badge count on startup
+// Poll for tasks from server
+const API_BASE_URL = 'http://localhost:3001/api';
+let pollingInterval = null;
+
+async function pollForTasks() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/tasks`);
+    if (!response.ok) {
+      console.error('Failed to fetch tasks:', response.status);
+      return;
+    }
+    
+    const { tasks } = await response.json();
+    
+    if (tasks && tasks.length > 0) {
+      // Add new tasks to local storage
+      const existingTasks = await getTasks();
+      const existingTaskIds = new Set(existingTasks.map(t => t.id));
+      
+      for (const task of tasks) {
+        if (!existingTaskIds.has(task.id)) {
+          await handleAddTask(task);
+          
+          // Mark task as handled on server
+          await fetch(`${API_BASE_URL}/tasks/${task.id}/handled`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error polling for tasks:', error);
+  }
+}
+
+// Start polling
+function startPolling() {
+  if (pollingInterval) return;
+  
+  pollingInterval = setInterval(pollForTasks, 500);
+  console.log('Started polling for tasks every 500ms');
+  
+  // Initial poll
+  pollForTasks();
+}
+
+// Initialize badge count and start polling on startup
 (async () => {
   try {
     await updateBadgeCount();
+    startPolling();
   } catch (error) {
-    console.error('Failed to initialize badge count:', error);
+    console.error('Failed to initialize:', error);
   }
 })();
 
@@ -152,41 +213,51 @@ function generateTaskId() {
 // Manual trigger for testing (can be called from console)
 // Note: Service workers don't have window object, so we'll use chrome.runtime instead
 globalThis.addTestEmailTask = async function() {
-  const testTask = {
-    type: 'email',
-    data: {
-      to: 'test@example.com',
-      subject: 'Test Email from TEDAI',
-      body: 'This is a test email created by the TEDAI AI Agent.'
+  try {
+    console.log('=== addTestEmailTask function called ===');
+    console.log('Triggering email task generation...');
+    
+    const response = await fetch(`${API_BASE_URL}/generate-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({})
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
-  
-  await handleAddTask(testTask);
-  console.log('Test email task added');
+    
+    const result = await response.json();
+    console.log('Email task generation triggered:', result);
+    console.log('Task will appear via polling...');
+  } catch (error) {
+    console.error('Failed to trigger test email task:', error);
+  }
 };
 
 globalThis.addTestCalendarTask = async function() {
-  // Create a test calendar event for tomorrow at 2 PM, 1 hour duration
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(14, 0, 0, 0); // 2 PM
-  
-  const endTime = new Date(tomorrow);
-  endTime.setHours(15, 0, 0, 0); // 3 PM
-  
-  const testTask = {
-    type: 'calendar',
-    data: {
-      title: 'TEDAI Test Meeting',
-      description: 'This is a test calendar event created by the TEDAI AI Agent to demonstrate calendar functionality.',
-      startTime: tomorrow.toISOString(),
-      endTime: endTime.toISOString(),
-      attendees: ['colleague@example.com', 'manager@example.com'],
-      location: 'Conference Room A',
-      reminder: 15 // 15 minutes before
+  try {
+    console.log('=== addTestCalendarTask function called ===');
+    console.log('Triggering calendar task generation...');
+    
+    const response = await fetch(`${API_BASE_URL}/generate-calendar`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({})
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
-  
-  await handleAddTask(testTask);
-  console.log('Test calendar task added');
+    
+    const result = await response.json();
+    console.log('Calendar task generation triggered:', result);
+    console.log('Task will appear via polling...');
+  } catch (error) {
+    console.error('Failed to trigger test calendar task:', error);
+  }
 };

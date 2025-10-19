@@ -7,19 +7,27 @@ import {
   sessionExists,
   getAllSessions
 } from '../../services/chat';
-import { generateChatResponse } from '../../services/gemini_chat';
+import { generateChatResponse } from '../../services/gemini';
 
 const router = Router();
 
 // Store pending polling requests
 interface PendingRequest {
+  id: string;
   sessionId: string;
   lastMessageId: number;
+  res: any; // Express Response object
   resolve: (value: any) => void;
   timeout: NodeJS.Timeout;
 }
 
 const pendingRequests: Map<string, PendingRequest[]> = new Map();
+
+// Generate unique ID for each pending request
+let requestIdCounter = 0;
+function generateRequestId(): string {
+  return `req_${Date.now()}_${++requestIdCounter}`;
+}
 
 /**
  * POST /api/chat/session
@@ -102,10 +110,32 @@ router.post('/session/:sessionId/message', async (req, res) => {
     const { sessionId } = req.params;
     const { message } = req.body;
 
+    // Input validation
     if (!message || typeof message !== 'string') {
       res.status(400).json({ 
         success: false, 
-        error: 'Message is required' 
+        error: 'Message is required and must be a string' 
+      });
+      return;
+    }
+
+    // Trim and validate message content
+    const trimmedMessage = message.trim();
+    
+    if (trimmedMessage.length === 0) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Message cannot be empty or contain only whitespace' 
+      });
+      return;
+    }
+
+    // Enforce maximum message length (4000 characters)
+    const MAX_MESSAGE_LENGTH = 4000;
+    if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+      res.status(400).json({ 
+        success: false, 
+        error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters (received ${trimmedMessage.length})` 
       });
       return;
     }
@@ -119,8 +149,8 @@ router.post('/session/:sessionId/message', async (req, res) => {
       return;
     }
 
-    // Save user message
-    const userMessageId = await saveMessage(sessionId, 'user', message);
+    // Save user message (using trimmed message)
+    const userMessageId = await saveMessage(sessionId, 'user', trimmedMessage);
 
     // Notify any pending polling requests about the new user message
     notifyPendingRequests(sessionId, userMessageId);
@@ -189,15 +219,16 @@ router.get('/session/:sessionId/poll', async (req, res) => {
 
     // No new messages, set up long-polling
     let responseHandled = false;
+    const requestId = generateRequestId();
     
     const timeout = setTimeout(() => {
       if (responseHandled) return;
       responseHandled = true;
       
       // Remove from pending requests
-      removePendingRequest(sessionId, timeout);
+      removePendingRequest(sessionId, requestId);
       
-      // Return empty result after timeout
+      // Return empty result after timeout if not already sent
       if (!res.headersSent) {
         res.json({ 
           success: true, 
@@ -212,8 +243,10 @@ router.get('/session/:sessionId/poll', async (req, res) => {
     }
 
     pendingRequests.get(sessionId)!.push({
+      id: requestId,
       sessionId,
       lastMessageId,
+      res,
       resolve: (messages) => {
         if (responseHandled) return;
         responseHandled = true;
@@ -233,7 +266,7 @@ router.get('/session/:sessionId/poll', async (req, res) => {
     req.on('close', () => {
       if (!responseHandled) {
         responseHandled = true;
-        removePendingRequest(sessionId, timeout);
+        removePendingRequest(sessionId, requestId);
       }
     });
 
@@ -255,27 +288,47 @@ function notifyPendingRequests(sessionId: string, newMessageId: number) {
 
   // Get new messages for all pending requests
   getSessionHistory(sessionId).then(allMessages => {
-    // Clear all pending requests for this session BEFORE resolving
-    // to prevent double-sending if timeout fires
-    pendingRequests.delete(sessionId);
+    const unresolvedRequests: PendingRequest[] = [];
     
     requests.forEach(request => {
+      // Skip if connection is already closed
+      if (request.res.headersSent || request.res.writableEnded) {
+        clearTimeout(request.timeout);
+        return;
+      }
+
       const newMessages = allMessages.filter(msg => msg.id > request.lastMessageId);
       if (newMessages.length > 0) {
+        // Resolve this request with new messages
         request.resolve(newMessages);
+      } else {
+        // No new messages for this request yet, keep it waiting
+        unresolvedRequests.push(request);
       }
     });
+    
+    // Update the map with only unresolved requests
+    if (unresolvedRequests.length > 0) {
+      pendingRequests.set(sessionId, unresolvedRequests);
+    } else {
+      pendingRequests.delete(sessionId);
+    }
+  }).catch(err => {
+    console.error('Error in notifyPendingRequests:', err);
+    // Clean up all requests for this session on error
+    requests.forEach(r => clearTimeout(r.timeout));
+    pendingRequests.delete(sessionId);
   });
 }
 
 /**
- * Remove a specific pending request
+ * Remove a specific pending request by ID
  */
-function removePendingRequest(sessionId: string, timeout: NodeJS.Timeout) {
+function removePendingRequest(sessionId: string, requestId: string) {
   const requests = pendingRequests.get(sessionId);
   if (!requests) return;
 
-  const index = requests.findIndex(r => r.timeout === timeout);
+  const index = requests.findIndex(r => r.id === requestId);
   if (index !== -1) {
     clearTimeout(requests[index].timeout);
     requests.splice(index, 1);
