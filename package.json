@@ -1,1 +1,17 @@
-# Root Package Configuration
+{
+  "name": "tedai-hackathon",
+  "version": "1.0.0",
+  "description": "TEDAI Hackathon Project: Proactive AI Agent with Chat Interface",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "chat-frontend"
+  ],
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd chat-frontend && npm run dev"
+  },
+  "keywords": ["ai", "chat", "screen-monitoring", "hackathon"],
+  "author": "",
+  "license": "ISC"
+}
