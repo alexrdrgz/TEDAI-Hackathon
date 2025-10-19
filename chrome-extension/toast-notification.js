@@ -50,8 +50,8 @@ function createStickyButton() {
         width: 56px;
         height: 56px;
         border-radius: 28px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+        background: #4493F8;
+        box-shadow: 0 4px 16px rgba(68, 147, 248, 0.4);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -59,7 +59,7 @@ function createStickyButton() {
 
       .tedai-sticky-button.small:hover {
         transform: scale(1.1);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        box-shadow: 0 6px 20px rgba(68, 147, 248, 0.5);
       }
 
       .tedai-sticky-button.small:active {
@@ -71,8 +71,9 @@ function createStickyButton() {
         width: 360px;
         max-width: calc(100vw - 40px);
         border-radius: 12px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        background: #0C1117;
+        border: 1px solid #30363D;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
         backdrop-filter: blur(10px);
         animation: tedai-expand 0.3s ease-out;
       }
@@ -83,8 +84,9 @@ function createStickyButton() {
         max-width: calc(100vw - 40px);
         max-height: 500px;
         border-radius: 12px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        background: #0C1117;
+        border: 1px solid #30363D;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
         backdrop-filter: blur(10px);
         animation: tedai-expand 0.3s ease-out;
         display: flex;
@@ -109,14 +111,14 @@ function createStickyButton() {
       .tedai-button-icon {
         width: 32px;
         height: 32px;
-        background: rgba(255, 255, 255, 0.95);
+        background: #F0F6FC;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 18px;
         font-weight: bold;
-        color: #667eea;
+        color: #4493F8;
       }
 
       /* Badge count */
@@ -126,8 +128,8 @@ function createStickyButton() {
         right: -4px;
         min-width: 20px;
         height: 20px;
-        background: #ff4444;
-        color: white;
+        background: #DA3633;
+        color: #F0F6FC;
         border-radius: 10px;
         font-size: 11px;
         font-weight: 600;
@@ -135,13 +137,13 @@ function createStickyButton() {
         align-items: center;
         justify-content: center;
         padding: 0 6px;
-        border: 2px solid white;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        border: 2px solid #0C1117;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       }
 
       /* Notification content */
       .tedai-notification-content {
-        color: white;
+        color: #F0F6FC;
         display: none;
       }
 
@@ -155,7 +157,7 @@ function createStickyButton() {
 
       /* Queue view content */
       .tedai-queue-content {
-        color: white;
+        color: #F0F6FC;
         display: none;
         flex-direction: column;
         height: 100%;
@@ -174,7 +176,7 @@ function createStickyButton() {
         display: flex;
         align-items: center;
         padding: 16px 16px 12px 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        border-bottom: 1px solid #30363D;
         flex-shrink: 0;
       }
 
@@ -188,7 +190,7 @@ function createStickyButton() {
       .tedai-queue-close {
         background: none;
         border: none;
-        color: white;
+        color: #F0F6FC;
         font-size: 28px;
         line-height: 1;
         cursor: pointer;
@@ -204,7 +206,7 @@ function createStickyButton() {
       }
 
       .tedai-queue-close:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: #30363D;
         opacity: 1;
       }
 
@@ -219,29 +221,30 @@ function createStickyButton() {
       }
 
       .tedai-queue-list::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.1);
+        background: #161B22;
         border-radius: 3px;
       }
 
       .tedai-queue-list::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.3);
+        background: #484F58;
         border-radius: 3px;
       }
 
       .tedai-queue-list::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.5);
+        background: #6E7681;
       }
 
       .tedai-queue-item {
-        background: rgba(255, 255, 255, 0.1);
+        background: #161B22;
         border-radius: 8px;
         padding: 12px;
         margin-bottom: 8px;
+        border: 1px solid #30363D;
         transition: background 0.2s;
       }
 
       .tedai-queue-item:hover {
-        background: rgba(255, 255, 255, 0.15);
+        background: #21262D;
       }
 
       .tedai-queue-item:last-child {
@@ -256,13 +259,14 @@ function createStickyButton() {
       }
 
       .tedai-queue-item-type {
-        background: rgba(255, 255, 255, 0.2);
+        background: #21262D;
         padding: 2px 8px;
         border-radius: 4px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        color: #8B949E;
       }
 
       .tedai-queue-item-time {
@@ -292,7 +296,7 @@ function createStickyButton() {
       }
 
       .tedai-queue-footer {
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        border-top: 1px solid #30363D;
         padding: 12px 16px;
         flex-shrink: 0;
       }
@@ -306,12 +310,12 @@ function createStickyButton() {
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
-        background: white;
-        color: #667eea;
+        background: #4493F8;
+        color: #F0F6FC;
       }
 
       .tedai-queue-footer-btn:hover {
-        background: #f0f0f0;
+        background: #58A6FF;
         transform: translateY(-1px);
       }
 
@@ -319,13 +323,13 @@ function createStickyButton() {
         display: flex;
         align-items: center;
         padding: 16px 16px 12px 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        border-bottom: 1px solid #30363D;
       }
 
       .tedai-notification-icon {
         width: 32px;
         height: 32px;
-        background: rgba(255, 255, 255, 0.2);
+        background: #21262D;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -333,6 +337,7 @@ function createStickyButton() {
         font-size: 20px;
         font-weight: bold;
         margin-right: 12px;
+        color: #4493F8;
       }
 
       .tedai-notification-title {
@@ -345,7 +350,7 @@ function createStickyButton() {
       .tedai-notification-close {
         background: none;
         border: none;
-        color: white;
+        color: #F0F6FC;
         font-size: 28px;
         line-height: 1;
         cursor: pointer;
@@ -361,7 +366,7 @@ function createStickyButton() {
       }
 
       .tedai-notification-close:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: #30363D;
         opacity: 1;
       }
 
@@ -394,22 +399,22 @@ function createStickyButton() {
       }
 
       .tedai-notification-btn-primary {
-        background: white;
-        color: #667eea;
+        background: #2A903B;
+        color: #F0F6FC;
       }
 
       .tedai-notification-btn-primary:hover {
-        background: #f0f0f0;
+        background: #3FB950;
         transform: translateY(-1px);
       }
 
       .tedai-notification-btn-secondary {
-        background: rgba(255, 255, 255, 0.15);
-        color: white;
+        background: #DA3633;
+        color: #F0F6FC;
       }
 
       .tedai-notification-btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.25);
+        background: #F85149;
       }
 
       /* Swipeable container */
@@ -442,22 +447,22 @@ function createStickyButton() {
       }
 
       .tedai-queue-approve-btn {
-        background: rgba(76, 175, 80, 0.3);
-        color: white;
+        background: #2A903B;
+        color: #F0F6FC;
       }
 
       .tedai-queue-approve-btn:hover {
-        background: rgba(76, 175, 80, 0.5);
+        background: #3FB950;
         transform: scale(1.1);
       }
 
       .tedai-queue-reject-btn {
-        background: rgba(244, 67, 54, 0.3);
-        color: white;
+        background: #DA3633;
+        color: #F0F6FC;
       }
 
       .tedai-queue-reject-btn:hover {
-        background: rgba(244, 67, 54, 0.5);
+        background: #F85149;
         transform: scale(1.1);
       }
 
