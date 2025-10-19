@@ -218,9 +218,13 @@ router.get('/session/:sessionId/poll', async (req, res) => {
     }
 
     // No new messages, set up long-polling
+    let responseHandled = false;
     const requestId = generateRequestId();
     
     const timeout = setTimeout(() => {
+      if (responseHandled) return;
+      responseHandled = true;
+      
       // Remove from pending requests
       removePendingRequest(sessionId, requestId);
       
@@ -244,6 +248,9 @@ router.get('/session/:sessionId/poll', async (req, res) => {
       lastMessageId,
       res,
       resolve: (messages) => {
+        if (responseHandled) return;
+        responseHandled = true;
+        
         clearTimeout(timeout);
         if (!res.headersSent) {
           res.json({ 
@@ -257,7 +264,10 @@ router.get('/session/:sessionId/poll', async (req, res) => {
 
     // Clean up on client disconnect
     req.on('close', () => {
-      removePendingRequest(sessionId, requestId);
+      if (!responseHandled) {
+        responseHandled = true;
+        removePendingRequest(sessionId, requestId);
+      }
     });
 
   } catch (error: any) {
