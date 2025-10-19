@@ -99,7 +99,8 @@ async function monitorAndScreenshot(): Promise<void> {
       const percentDifferent = await checkScreenDifference(lastScreenshotPath);
       
       let shouldTakeScreenshot = false;
-      
+      console.log('percentDifferent', percentDifferent);
+      console.log('timeSinceLastScreenshot', timeSinceLastScreenshot);
       // Heuristic logic
       if (percentDifferent > 15 && timeSinceLastScreenshot >= 5000) {
         // More than 15% different and at least 5 seconds have passed

@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import routes from './routes';
 import { initDatabase } from './services/db';
+import { initializeTools } from './services/tools';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -63,8 +64,22 @@ app.use('/api', routes);
 (async () => {
   try {
     await initDatabase();
-    app.listen(PORT, () => {
+    try {
+      initializeTools();
+    } catch (toolErr) {
+      console.error('Failed to initialize tools:', toolErr);
+      throw toolErr;
+    }
+    const server = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
+    });
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use. Please stop the process using that port.`);
+      } else {
+        console.error('❌ Failed to start server:', err);
+      }
+      throw err;
     });
   } catch (err) {
     console.error('Failed to initialize database:', err);
