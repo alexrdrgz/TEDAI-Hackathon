@@ -6,8 +6,13 @@ import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask, analy
 import { addSnapshot, getLastSessionSnapshot, getSessionSnapshots, getAllSnapshots } from '../../services/snapshots';
 import { getSessionTimeline, addTimelineEntry } from '../../services/timeline';
 import { startStreaming, stopStreaming, isStreamingActive } from '../../services/streaming';
+import { createTask } from '../../services/db';
 
 const router = Router();
+
+function generateTaskId(): string {
+  return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
 
 router.get('/screenshot', async (req, res) => {
   try {

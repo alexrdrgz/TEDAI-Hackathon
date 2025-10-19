@@ -8,6 +8,9 @@ dotenv.config();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
 interface Part {
   text?: string;
   functionCall?: {
@@ -19,6 +22,30 @@ interface Part {
 interface Content {
   role: 'user' | 'model';
   parts: Part[];
+}
+
+interface RetryOptions {
+  maxRetries?: number;
+  delayMs?: number;
+}
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? MAX_RETRIES;
+  const delayMs = options.delayMs ?? RETRY_DELAY_MS;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+    }
+  }
+
+  throw new Error('Retry exhausted');
 }
 
 export async function checkAndGenerateTask(
@@ -195,6 +222,12 @@ If you think an email or calendar event should be created, use the appropriate t
           console.error(`[checkAndGenerateTask] Error executing tool ${toolUse.name}:`, error.message);
         }
       }
+
+      return {
+        shouldCreate: true,
+        taskType: 'auto-generated',
+        reasoning: 'Task created via tool execution'
+      };
     } catch (error: any) {
       console.error('[checkAndGenerateTask] Error:', error.message);
       return null;
