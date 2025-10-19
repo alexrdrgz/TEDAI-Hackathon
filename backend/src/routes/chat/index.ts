@@ -56,9 +56,26 @@ router.post('/session', async (req, res) => {
 router.get('/sessions', async (req, res) => {
   try {
     const sessions = await getAllSessions();
+    
+    // Enrich sessions with first user message as title
+    const enrichedSessions = await Promise.all(
+      sessions.map(async (session) => {
+        const messages = await getSessionHistory(session.session_id, 50);
+        const firstUserMessage = messages.find(m => m.role === 'user');
+        const title = firstUserMessage 
+          ? firstUserMessage.content.substring(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '')
+          : 'New Chat';
+        
+        return {
+          ...session,
+          title
+        };
+      })
+    );
+    
     res.json({ 
       success: true, 
-      sessions 
+      sessions: enrichedSessions
     });
   } catch (error: any) {
     console.error('[GetSessions] Error:', error.message);

@@ -23,7 +23,11 @@ export interface Tool {
 
 // Import all tools
 import { getSnapshotContextTool } from './getSnapshotContext';
+<<<<<<< HEAD
 import { sendEmailTool } from './sendEmail';
+=======
+import { createEmailTool } from './createEmail';
+>>>>>>> main
 import { createCalendarEventTool } from './createCalendarEvent';
 
 const tools: Map<string, Tool> = new Map();
@@ -36,7 +40,11 @@ export function registerTool(tool: Tool) {
 // Initialize all tools
 export function initializeTools() {
   registerTool(getSnapshotContextTool);
+<<<<<<< HEAD
   registerTool(sendEmailTool);
+=======
+  registerTool(createEmailTool);
+>>>>>>> main
   registerTool(createCalendarEventTool);
 }
 
@@ -47,6 +55,17 @@ export function getToolDefinitions() {
     description: tool.description,
     parameters: tool.parameters
   }));
+}
+
+// Get only task creation tools (email and calendar)
+export function getTaskCreationToolDefinitions() {
+  return Array.from(tools.values())
+    .filter(tool => tool.name === 'create_email' || tool.name === 'create_calendar_event')
+    .map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters
+    }));
 }
 
 // Execute a tool
