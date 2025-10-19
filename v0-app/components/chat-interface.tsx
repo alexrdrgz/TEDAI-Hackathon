@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { ArrowUp, Mic, Plus, BarChart3, X } from "lucide-react"
+import { ArrowUp, Mic, Plus, BarChart3 } from "lucide-react"
 import { VoiceOrb } from "@/components/voice-orb"
 import { useSession } from "@/lib/session-context"
 import { useVoiceMode } from "@/hooks/useVoiceMode"
@@ -13,7 +13,7 @@ import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
 
 interface ChatMessage extends Message {
-  id: number
+  id: string | number
 }
 
 export function ChatInterface() {
@@ -34,38 +34,6 @@ export function ChatInterface() {
         description: err,
         variant: "destructive",
       })
-    },
-    onSilenceDetected: async (audioBlob) => {
-      if (!sessionId) return
-      
-      setIsLoading(true)
-      
-      try {
-        const result = await sendVoiceMessage(sessionId, audioBlob)
-        
-        const audioBytes = atob(result.audio)
-        const audioArray = new Uint8Array(audioBytes.length)
-        for (let i = 0; i < audioBytes.length; i++) {
-          audioArray[i] = audioBytes.charCodeAt(i)
-        }
-        const responseAudioBlob = new Blob([audioArray.buffer], { type: "audio/wav" })
-        
-        await voice.playAudio(responseAudioBlob)
-        
-        // Restart VAD after response finishes
-        if (isVoiceMode) {
-          await voice.startVAD()
-        }
-      } catch (err: any) {
-        console.error("Voice message error:", err)
-        toast({
-          title: "Error",
-          description: err.message || "Failed to process voice message",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
-      }
     },
   })
 
@@ -88,7 +56,7 @@ export function ChatInterface() {
         setMessages(
           initialMessages.map((m) => ({
             ...m,
-            id: m.id,
+            id: m.id.toString(),
           }))
         )
 
@@ -96,13 +64,13 @@ export function ChatInterface() {
 
         stopPollingRef.current = startPolling(sessionId, lastMessageId, (newMessages) => {
           setMessages((prev) => {
-            const existingIds = new Set(prev.map((m) => m.id))
-            const uniqueNewMessages = newMessages.filter((m) => !existingIds.has(m.id))
+            const existingIds = new Set(prev.map((m) => String(m.id)))
+            const uniqueNewMessages = newMessages.filter((m) => !existingIds.has(String(m.id)))
             return [
               ...prev,
               ...uniqueNewMessages.map((m) => ({
                 ...m,
-                id: m.id,
+                id: m.id.toString(),
               })),
             ]
           })
@@ -151,23 +119,58 @@ export function ChatInterface() {
   }
 
   const handleVoiceToggle = async (enabled: boolean) => {
-    if (enabled) {
-      if (!voice.hasPermission) {
-        const granted = await voice.requestMicrophonePermission()
-        if (!granted) {
-          return
-        }
+    if (enabled && !voice.hasPermission) {
+      const granted = await voice.requestMicrophonePermission()
+      if (!granted) {
+        return
       }
-      setIsVoiceMode(true)
-      // Start VAD automatically
-      await voice.startVAD()
-    } else {
-      voice.stopVAD()
-      voice.stopAudio()
-      setIsVoiceMode(false)
     }
+    setIsVoiceMode(enabled)
   }
 
+  const handleVoiceButtonClick = async () => {
+    if (!sessionId) return
+
+    if (voice.isRecording) {
+      const audioBlob = await voice.stopRecording()
+      if (!audioBlob) {
+        toast({
+          title: "Error",
+          description: "Failed to record audio",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setIsLoading(true)
+
+      try {
+        const result = await sendVoiceMessage(sessionId, audioBlob)
+
+        const audioBytes = atob(result.audio)
+        const audioArray = new Uint8Array(audioBytes.length)
+        for (let i = 0; i < audioBytes.length; i++) {
+          audioArray[i] = audioBytes.charCodeAt(i)
+        }
+        const responseAudioBlob = new Blob([audioArray.buffer], { type: "audio/wav" })
+
+        await voice.playAudio(responseAudioBlob)
+      } catch (err: any) {
+        console.error("Voice message error:", err)
+        toast({
+          title: "Error",
+          description: err.message || "Failed to process voice message",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    } else if (voice.isSpeaking) {
+      voice.stopAudio()
+    } else {
+      await voice.startRecording()
+    }
+  }
 
   if (sessionLoading) {
     return (
@@ -237,25 +240,8 @@ export function ChatInterface() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {isVoiceMode ? (
-          <div className="flex-1 flex flex-col bg-gradient-to-b from-background to-secondary/20">
-            <div className="flex justify-end p-4">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={async () => {
-                  voice.stopVAD()
-                  await voice.stopRecording(true) // Cancel recording
-                  voice.stopAudio()
-                  setIsVoiceMode(false)
-                }}
-                className="rounded-full w-10 h-10 hover:bg-destructive/20 hover:text-destructive transition-all duration-200"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-            <div className="flex-1 flex items-center justify-center">
-              <VoiceOrb isPlaying={voice.isRecording} isSpeaking={voice.isSpeaking} isVoiceDetected={voice.isVoiceDetected} />
-            </div>
+          <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-background to-secondary/20">
+            <VoiceOrb isPlaying={voice.isRecording} />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-6">
@@ -322,28 +308,32 @@ export function ChatInterface() {
                 disabled={isVoiceMode || isLoading}
                 rows={1}
                 className="flex-1 resize-none bg-transparent border-none focus:outline-none px-5 py-4 text-sm min-h-[56px] max-h-[200px] overflow-y-auto break-words disabled:opacity-50"
+                style={{
+                  fieldSizing: "content",
+                }}
               />
               <div className="flex items-center gap-2 pr-3 pb-3">
-                {!input && !isVoiceMode && (
+                {!input && (
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => handleVoiceToggle(true)}
-                    className="rounded-full w-10 h-10 transition-all duration-200"
+                    onClick={() => handleVoiceToggle(!isVoiceMode)}
+                    className={cn(
+                      "rounded-full w-10 h-10 transition-all duration-200",
+                      isVoiceMode && "bg-primary text-primary-foreground hover:bg-primary/90"
+                    )}
                   >
                     <Mic className="w-5 h-5" />
                   </Button>
                 )}
-                {!isVoiceMode && (
-                  <Button
-                    size="icon"
-                    onClick={handleSend}
-                    disabled={!input.trim() || isLoading}
-                    className="rounded-full w-10 h-10 bg-primary hover:bg-primary/90 transition-all duration-200 disabled:opacity-50"
-                  >
-                    <ArrowUp className="w-5 h-5" />
-                  </Button>
-                )}
+                <Button
+                  size="icon"
+                  onClick={isVoiceMode ? handleVoiceButtonClick : handleSend}
+                  disabled={!input.trim() && !isVoiceMode || isVoiceMode && isLoading}
+                  className="rounded-full w-10 h-10 bg-primary hover:bg-primary/90 transition-all duration-200 disabled:opacity-50"
+                >
+                  {isVoiceMode ? <Mic className="w-5 h-5" /> : <ArrowUp className="w-5 h-5" />}
+                </Button>
               </div>
             </div>
           </div>
@@ -352,5 +342,3 @@ export function ChatInterface() {
     </div>
   )
 }
-
-
