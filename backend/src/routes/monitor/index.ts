@@ -1,12 +1,17 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshotStructured, generateTimelineEntry } from '../../services/gemini-structured';
+import { summarizeScreenshotStructured, generateTimelineEntry, checkAndGenerateTask } from '../../services/gemini-structured';
 import { addSnapshot, getLastSessionSnapshot } from '../../services/snapshots';
 import { getSessionTimeline, addTimelineEntry } from '../../services/timeline';
 import { startStreaming, stopStreaming, isStreamingActive } from '../../services/streaming';
+import { createTask } from '../../services/db';
 
 const router = Router();
+
+function generateTaskId(): string {
+  return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
 
 router.get('/screenshot', async (req, res) => {
   try {
@@ -16,7 +21,8 @@ router.get('/screenshot', async (req, res) => {
     const args = [];
     if (width) args.push(width.toString());
     if (height) args.push(height.toString());
-
+    // debug: wait 1 second
+    await new Promise(resolve => setTimeout(resolve, 1000));
     const pythonProcess = spawn('python3', [path.join(__dirname, '../../../screen_monitor/get_screenshot.py'), ...args]);
     let screenshotPath = '';
     let error = '';
@@ -52,11 +58,29 @@ router.get('/screenshot', async (req, res) => {
           // Store in database
           await addSnapshot(filePath, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
           
-          // Generate and append timeline entry
+          // Get current timeline for task generation
           const currentTimeline = await getSessionTimeline(sessionId);
+          
+          // Generate timeline entry and check for tasks in parallel
           const timestamp = new Date().toISOString();
-          const newEntry = await generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp);
+          
+          const [newEntry, taskCheckResult] = await Promise.all([
+            generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp),
+            checkAndGenerateTask(filePath, summary.Caption, summary.Changes, currentTimeline, summary.FullDescription)
+          ]);
+          
           await addTimelineEntry(sessionId, newEntry, summary.Caption, timestamp);
+          
+          // Create task if recommended by Gemini
+          if (taskCheckResult?.shouldCreate && taskCheckResult?.taskType) {
+            try {
+              const taskId = generateTaskId();
+              console.log(`Creating ${taskCheckResult.taskType} task:`, taskCheckResult.reasoning);
+              await createTask(taskId, taskCheckResult.taskType, taskCheckResult.taskData || {});
+            } catch (taskError) {
+              console.error('Error creating auto-generated task:', taskError);
+            }
+          }
           
           res.json({ 
             screenshot: filePath, 
