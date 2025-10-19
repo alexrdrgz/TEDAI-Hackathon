@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import ChatInterface from './components/ChatInterface';
 import { createSession } from './services/api';
 import './App.css';
@@ -77,6 +77,9 @@ function App() {
       <button className="new-session-button" onClick={handleNewSession} title="Start new session">
         ➕
       </button>
+      <a href="/stats" className="stats-button" title="View Timeline Stats">
+        📊
+      </a>
     </div>
   );
 }

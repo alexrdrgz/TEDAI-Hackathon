@@ -110,6 +110,36 @@
   transform: scale(0.95);
 }
 
+.stats-button {
+  position: fixed;
+  bottom: 32px;
+  right: 104px;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: white;
+  color: #667eea;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s, box-shadow 0.2s;
+  z-index: 1000;
+  text-decoration: none;
+}
+
+.stats-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.stats-button:active {
+  transform: scale(0.95);
+}
+
 @media (max-width: 768px) {
   .app {
     padding: 0;
@@ -118,6 +148,14 @@
   .new-session-button {
     bottom: 16px;
     right: 16px;
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+
+  .stats-button {
+    bottom: 16px;
+    right: 72px;
     width: 48px;
     height: 48px;
     font-size: 20px;

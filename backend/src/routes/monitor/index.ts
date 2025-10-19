@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask } from '../../services/gemini';
-import { addSnapshot, getLastSessionSnapshot } from '../../services/snapshots';
+import { addSnapshot, getLastSessionSnapshot, getSessionSnapshots, getAllSnapshots } from '../../services/snapshots';
 import { getSessionTimeline, addTimelineEntry } from '../../services/timeline';
 import { startStreaming, stopStreaming, isStreamingActive } from '../../services/streaming';
 import { createTask } from '../../services/db';
@@ -56,7 +57,8 @@ router.get('/screenshot', async (req, res) => {
           }
           
           // Store in database
-          await addSnapshot(filePath, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
+          const filename = path.basename(filePath);
+          await addSnapshot(filename, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
           
           // Get current timeline for task generation
           const currentTimeline = await getSessionTimeline(sessionId);
@@ -112,6 +114,51 @@ router.get('/streaming', (req, res) => {
     stopStreaming();
     console.log('Screenshot streaming STOPPED - Monitoring is now inactive');
     res.json({ status: 'streaming stopped', isActive: isStreamingActive() });
+  }
+});
+
+router.get('/timeline/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const snapshots = await getSessionSnapshots(sessionId);
+    res.json({ success: true, snapshots });
+  } catch (error) {
+    console.error('Error fetching timeline:', error);
+    res.status(500).json({ error: 'Failed to fetch timeline' });
+  }
+});
+
+router.get('/timeline', async (req, res) => {
+  try {
+    const snapshots = await getAllSnapshots();
+    res.json({ success: true, snapshots });
+  } catch (error) {
+    console.error('Error fetching all snapshots:', error);
+    res.status(500).json({ error: 'Failed to fetch snapshots' });
+  }
+});
+
+router.get('/screenshot/:filename', (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(__dirname, '../../..', 'screenshots', filename);
+    
+    // Prevent directory traversal
+    const resolvedPath = path.resolve(filePath);
+    const screenshotsDir = path.resolve(path.join(__dirname, '../../..', 'screenshots'));
+    
+    if (!resolvedPath.startsWith(screenshotsDir)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(404).json({ error: 'Screenshot not found' });
+    }
+    
+    res.sendFile(resolvedPath);
+  } catch (error) {
+    console.error('Error serving screenshot:', error);
+    res.status(500).json({ error: 'Failed to serve screenshot' });
   }
 });
 

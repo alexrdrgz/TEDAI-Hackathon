@@ -243,3 +243,31 @@ export async function sendVoiceMessage(
   throw new Error(response.data.error || 'Failed to send voice message');
 }
 
+/**
+ * Get timeline snapshots for a session
+ */
+export interface Snapshot {
+  screenshot_path: string;
+  caption: string;
+  full_description: string;
+  changes: string[];
+  facts: string[];
+  created_at: string;
+}
+
+export async function getTimelineSnapshots(sessionId: string): Promise<Snapshot[]> {
+  const response = await axios.get(`${API_BASE_URL}/monitor/timeline/${sessionId}`);
+  if (response.data.success) {
+    return response.data.snapshots;
+  }
+  throw new Error('Failed to fetch timeline snapshots');
+}
+
+export async function getAllSnapshots(): Promise<Snapshot[]> {
+  const response = await axios.get(`${API_BASE_URL}/monitor/timeline`);
+  if (response.data.success) {
+    return response.data.snapshots;
+  }
+  throw new Error('Failed to fetch all snapshots');
+}
+

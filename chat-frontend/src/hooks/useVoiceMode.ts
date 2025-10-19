@@ -20,7 +20,8 @@ interface UseVoiceModeReturn {
   hasPermission: boolean;
 }
 
-export function useVoiceMode({ onTranscription, onError }: UseVoiceModeProps = {}): UseVoiceModeReturn {
+
+export function useVoiceMode({ onTranscription: _onTranscription, onError }: UseVoiceModeProps = {}): UseVoiceModeReturn {
   const [state, setState] = useState<VoiceState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean>(false);
@@ -201,7 +202,7 @@ export function useVoiceMode({ onTranscription, onError }: UseVoiceModeProps = {
           resolve();
         };
 
-        audio.onerror = (err) => {
+        audio.onerror = (_err) => {
           URL.revokeObjectURL(url);
           audioElementRef.current = null;
           setState('error');
