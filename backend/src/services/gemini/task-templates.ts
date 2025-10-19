@@ -1,46 +1,10 @@
-// Gemini Service Template
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import axios from 'axios';
-import * as fs from 'fs';
-import * as path from 'path';
+import { EmailScenario, CalendarScenario } from '../../data/mockScenarios';
 import dotenv from 'dotenv';
-import { EmailScenario, CalendarScenario } from '../data/mockScenarios';
 
 dotenv.config();
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY as string);
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-
-export async function summarizeScreenshot(screenshotPath: string): Promise<string> {
-  // Read the screenshot file
-  const imageBuffer = fs.readFileSync(screenshotPath);
-  const imageData = imageBuffer.toString('base64');
-
-  // Call Gemini API
-  const response = await axios.post(
-    `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-    {
-      contents: [
-        {
-          parts: [
-            {
-              text: 'Describe what you see in this screenshot. What is the user doing? What are the main elements visible?'
-            },
-            {
-              inline_data: {
-                mime_type: 'image/png',
-                data: imageData
-              }
-            }
-          ]
-        }
-      ]
-    }
-  );
-
-  return response.data.candidates[0].content.parts[0].text;
-}
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function generateEmailFromContext(scenario: EmailScenario): Promise<{
   type: 'email';
@@ -50,7 +14,6 @@ export async function generateEmailFromContext(scenario: EmailScenario): Promise
     body: string;
   };
 }> {
-  // Check if we have a valid API key
   if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_actual_api_key_here') {
     throw new Error('GEMINI_API_KEY is required. Please set your API key in the .env file.');
   }
@@ -80,10 +43,8 @@ Make sure the email is professional, contextual, and addresses all the key point
     const response = await result.response;
     const generatedText = response.text();
     
-    // Clean up markdown formatting if present
     const cleanedText = generatedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
-    // Parse the JSON response
     const emailData = JSON.parse(cleanedText);
 
     return {
@@ -100,7 +61,6 @@ Make sure the email is professional, contextual, and addresses all the key point
   }
 }
 
-
 export async function generateCalendarFromContext(scenario: CalendarScenario): Promise<{
   type: 'calendar';
   data: {
@@ -113,7 +73,6 @@ export async function generateCalendarFromContext(scenario: CalendarScenario): P
     reminder?: number;
   };
 }> {
-  // Check if we have a valid API key
   if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_actual_api_key_here') {
     throw new Error('GEMINI_API_KEY is required. Please set your API key in the .env file.');
   }
@@ -151,10 +110,8 @@ Make sure the event details are professional, contextual, and appropriate for th
     const response = await result.response;
     const generatedText = response.text();
     
-    // Clean up markdown formatting if present
     const cleanedText = generatedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
-    // Parse the JSON response
     const calendarData = JSON.parse(cleanedText);
 
     return {
@@ -173,33 +130,4 @@ Make sure the event details are professional, contextual, and appropriate for th
     console.error('Error generating calendar event:', error);
     throw new Error(`Failed to generate calendar event from context: ${error instanceof Error ? error.message : String(error)}`);
   }
-}
-
-export async function generateSessionTimeline(
-  snapshots: Array<{ screenshot_path: string; summary: string; created_at: string }>
-): Promise<string> {
-  const context = snapshots
-    .map((snap) => {
-      const utcDate = new Date(snap.created_at);
-      const localTime = utcDate.toLocaleString();
-      return `[${localTime}]\n${snap.summary}`;
-    })
-    .join('\n\n---\n\n');
-
-  const response = await axios.post(
-    `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-    {
-      contents: [
-        {
-          parts: [
-            {
-              text: `Based on the following sequence of screenshot summaries from a user session, create a detailed timeline of what happened. Format it as a clear chronological narrative that shows the progression of activities.\n\nContext:\n${context}`
-            }
-          ]
-        }
-      ]
-    }
-  );
-
-  return response.data.candidates[0].content.parts[0].text;
 }

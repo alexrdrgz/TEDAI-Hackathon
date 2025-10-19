@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshotStructured, generateTimelineEntry } from './gemini-structured';
+import { summarizeScreenshot, generateTimelineEntry } from './gemini';
 import { addSnapshot, getLastSessionSnapshot } from './snapshots';
 import { getSessionTimeline, addTimelineEntry } from './timeline';
 
@@ -40,7 +40,7 @@ async function captureAndSaveScreenshot(): Promise<void> {
     const previousSnapshot = await getLastSessionSnapshot(sessionId);
     
     // Summarize with context
-    const summary = await summarizeScreenshotStructured(
+    const summary = await summarizeScreenshot(
       filePath,
       previousSnapshot ? { Caption: previousSnapshot.caption, FullDescription: '', Changes: previousSnapshot.changes, Facts: [] } : undefined
     );
