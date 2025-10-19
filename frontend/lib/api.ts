@@ -13,6 +13,7 @@ export interface Session {
   session_id: string;
   created_at: string;
   updated_at: string;
+  title?: string;
 }
 
 export interface Snapshot {
@@ -22,6 +23,18 @@ export interface Snapshot {
   changes: string[];
   facts: string[];
   created_at: string;
+}
+
+/**
+ * Get all chat sessions with titles
+ */
+export async function getSessions(): Promise<Session[]> {
+  const response = await fetch(`${API_BASE_URL}/chat/sessions`);
+  const data = await response.json();
+  if (data.success) {
+    return data.sessions;
+  }
+  throw new Error('Failed to fetch sessions');
 }
 
 /**

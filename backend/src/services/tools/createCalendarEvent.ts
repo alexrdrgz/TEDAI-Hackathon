@@ -7,7 +7,7 @@ function generateTaskId(): string {
 
 export const createCalendarEventTool: Tool = {
   name: 'create_calendar_event',
-  description: 'Create a calendar event by opening Google Calendar with pre-filled event details. IMPORTANT: Only use this tool AFTER the user has explicitly confirmed they want to create the event (e.g., "yes", "create it", "looks good", "go ahead"). Always present the final event details and ask for confirmation before calling this tool.',
+  description: 'Create a calendar event for the user to review and confirm. Use this when the user needs to schedule a meeting, set a reminder, or manage calendar events.',
   parameters: {
     type: 'object',
     properties: {
