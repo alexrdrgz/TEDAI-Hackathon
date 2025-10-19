@@ -23,6 +23,8 @@ export interface Tool {
 
 // Import all tools
 import { getSnapshotContextTool } from './getSnapshotContext';
+import { sendEmailTool } from './sendEmail';
+import { createCalendarEventTool } from './createCalendarEvent';
 
 const tools: Map<string, Tool> = new Map();
 
@@ -34,6 +36,8 @@ export function registerTool(tool: Tool) {
 // Initialize all tools
 export function initializeTools() {
   registerTool(getSnapshotContextTool);
+  registerTool(sendEmailTool);
+  registerTool(createCalendarEventTool);
 }
 
 // Get all tools for Gemini

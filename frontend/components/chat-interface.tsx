@@ -7,10 +7,11 @@ import { ArrowUp, Mic, Plus, BarChart3, X, Sparkles, MessageSquare } from "lucid
 import { VoiceOrb } from "@/components/voice-orb"
 import { useSession } from "@/lib/session-context"
 import { useVoiceMode } from "@/hooks/useVoiceMode"
-import { getMessages, sendMessage, sendVoiceMessage, startPolling, Message } from "@/lib/api"
+import { getMessages, sendMessage, sendVoiceMessage, startPolling, Message, getTask, Task, deleteTask } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
+import { useSearchParams } from "next/navigation"
 
 interface ChatMessage extends Message {
   id: number
@@ -18,11 +19,16 @@ interface ChatMessage extends Message {
 
 export function ChatInterface() {
   const { sessionId, isLoading: sessionLoading, error: sessionError, createNewSession } = useSession()
+  const searchParams = useSearchParams()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isVoiceMode, setIsVoiceMode] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [taskInitialized, setTaskInitialized] = useState(false)
+  const [taskCompleted, setTaskCompleted] = useState(false)
+  const [isClient, setIsClient] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const stopPollingRef = useRef<(() => void) | null>(null)
   const { toast } = useToast()
@@ -73,9 +79,74 @@ export function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  // Set client-side flag after hydration
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Load task data if editing (only on client side after hydration)
+  useEffect(() => {
+    if (!isClient) return
+    
+    const taskId = searchParams.get('taskId')
+    const taskType = searchParams.get('taskType')
+    
+    if (taskId && taskType && !taskInitialized && sessionId) {
+      setTaskInitialized(true)
+      
+      // Load task from backend
+      getTask(taskId).then(task => {
+        setEditingTask(task)
+        
+        // Format task details for display with full context
+        let taskDetails = ''
+        if (task.type === 'email') {
+          taskDetails = `I need to edit this email draft:
+
+📧 EMAIL DETAILS:
+To: ${task.data.to}${task.data.cc ? `\nCC: ${task.data.cc}` : ''}${task.data.bcc ? `\nBCC: ${task.data.bcc}` : ''}
+Subject: ${task.data.subject}
+
+Body:
+${task.data.body}
+
+---
+Please help me make any changes I need. When I'm satisfied with the edits, I'll ask you to send it.`
+        } else if (task.type === 'calendar') {
+          const startDate = new Date(task.data.startTime).toLocaleString()
+          const endDate = new Date(task.data.endTime).toLocaleString()
+          taskDetails = `I need to edit this calendar event:
+
+📅 EVENT DETAILS:
+Title: ${task.data.title}
+Start: ${startDate}
+End: ${endDate}${task.data.location ? `\nLocation: ${task.data.location}` : ''}${task.data.attendees && task.data.attendees.length > 0 ? `\nAttendees: ${task.data.attendees.join(', ')}` : ''}${task.data.description ? `\n\nDescription:\n${task.data.description}` : ''}
+
+---
+Please help me make any changes I need. When I'm satisfied with the edits, I'll ask you to create it.`
+        }
+        
+        // Auto-send initial message
+        sendMessage(sessionId, taskDetails).catch(err => {
+          toast({
+            title: "Error",
+            description: "Failed to initialize task editing",
+            variant: "destructive",
+          })
+        })
+      }).catch(err => {
+        toast({
+          title: "Error",
+          description: "Failed to load task details",
+          variant: "destructive",
+        })
+      })
+    }
+  }, [isClient, searchParams, sessionId, taskInitialized, toast])
 
   // Load initial messages and start polling
   useEffect(() => {
@@ -98,6 +169,29 @@ export function ChatInterface() {
           setMessages((prev) => {
             const existingIds = new Set(prev.map((m) => m.id))
             const uniqueNewMessages = newMessages.filter((m) => !existingIds.has(m.id))
+            
+            // Check if any new message indicates task completion
+            uniqueNewMessages.forEach((msg) => {
+              if (msg.role === 'assistant' && editingTask && !taskCompleted) {
+                const content = msg.content.toLowerCase()
+                if (content.includes('✓ email prepared') || content.includes('✓ calendar event prepared')) {
+                  // Tool was called successfully - delete the original editing task
+                  setTaskCompleted(true)
+                  deleteTask(editingTask.id).then(() => {
+                    console.log('Original editing task deleted:', editingTask.id)
+                    toast({
+                      title: "Success!",
+                      description: editingTask.type === 'email' 
+                        ? "Email is ready! Gmail will open shortly." 
+                        : "Event is ready! Google Calendar will open shortly.",
+                    })
+                  }).catch(err => {
+                    console.error('Failed to delete editing task:', err)
+                  })
+                }
+              }
+            })
+            
             return [
               ...prev,
               ...uniqueNewMessages.map((m) => ({
@@ -237,6 +331,26 @@ export function ChatInterface() {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
+        {editingTask && !taskCompleted && (
+          <div className="bg-blue-500/10 border-b border-blue-500/20 px-6 py-3">
+            <div className="max-w-3xl mx-auto flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-blue-500" />
+              <span className="text-sm font-medium text-blue-500">
+                Editing {editingTask.type} task
+              </span>
+            </div>
+          </div>
+        )}
+        {taskCompleted && (
+          <div className="bg-green-500/10 border-b border-green-500/20 px-6 py-3">
+            <div className="max-w-3xl mx-auto flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-green-500" />
+              <span className="text-sm font-medium text-green-500">
+                ✓ Task prepared! {editingTask?.type === 'email' ? 'Gmail' : 'Google Calendar'} will open shortly
+              </span>
+            </div>
+          </div>
+        )}
         {isVoiceMode ? (
           <div className="flex-1 flex flex-col bg-gradient-to-b from-background to-secondary/20">
             <div className="flex justify-end p-4">
@@ -298,6 +412,27 @@ export function ChatInterface() {
                       <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" />
                       <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "0.2s" }} />
                       <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "0.4s" }} />
+                    </div>
+                  </Card>
+                </div>
+              )}
+              {taskCompleted && (
+                <div className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <Card className="bg-green-500/10 border-green-500/30 px-4 py-4 rounded-2xl transition-all duration-200 w-full">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-2xl">✓</span>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-green-600 dark:text-green-400 mb-1">
+                          {editingTask?.type === 'email' ? 'Email Ready to Send!' : 'Event Ready to Create!'}
+                        </h3>
+                        <p className="text-sm text-green-700 dark:text-green-300">
+                          {editingTask?.type === 'email' 
+                            ? 'Gmail will open with your email. Review and click send when ready.' 
+                            : 'Google Calendar will open with your event. Review and save when ready.'}
+                        </p>
+                      </div>
                     </div>
                   </Card>
                 </div>
