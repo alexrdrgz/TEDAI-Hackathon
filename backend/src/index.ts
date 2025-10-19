@@ -59,12 +59,25 @@ app.use('/api', routes);
 (async () => {
   try {
     await initDatabase();
-    initializeTools();
-    app.listen(PORT, () => {
+    try {
+      initializeTools();
+    } catch (toolErr) {
+      console.error('Failed to initialize tools:', toolErr);
+      throw toolErr;
+    }
+    const server = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
+    });
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use. Please stop the process using that port.`);
+      } else {
+        console.error('❌ Failed to start server:', err);
+      }
+      throw err;
     });
   } catch (err) {
     console.error('Failed to initialize database:', err);
-    process.exit(1);
+    throw err;
   }
 })();
