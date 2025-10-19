@@ -1,12 +1,8 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { TimelineEntrySchema } from '../../models/index';
 import { withRetry } from '../retry';
 import { db } from '../db';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+import { CHEAP_MODEL } from '../config';
+import { generateContent } from '../../utils/modelUtils';
 
 export async function generateSessionTimeline(
   snapshots: Array<{
@@ -27,15 +23,13 @@ export async function generateSessionTimeline(
       })
       .join('\n\n---\n\n');
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-    });
+    const response = await generateContent(CHEAP_MODEL, [
+      {
+        text: `Based on the following sequence of screenshot captions and changes from a user session, create a detailed timeline of what happened. Format it as a clear chronological narrative that shows the progression of activities.\n\nContext:\n${context}`,
+      },
+    ]);
 
-    const response = await model.generateContent(
-      `Based on the following sequence of screenshot captions and changes from a user session, create a detailed timeline of what happened. Format it as a clear chronological narrative that shows the progression of activities.\n\nContext:\n${context}`
-    );
-
-    return response.response.text();
+    return response;
   });
 }
 
@@ -46,10 +40,6 @@ export async function generateTimelineEntry(
   createdAt: string
 ): Promise<string> {
   return withRetry(async () => {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-    });
-
     const timestamp = new Date(createdAt).toLocaleString();
     const changesText = changes.length
       ? changes.map((c) => `- ${c}`).join('\n')
@@ -69,10 +59,14 @@ Return a JSON object with:
 {
   "entry": "the new timeline entry text"
 }`;
+    console.log("sending prompt to model: ", CHEAP_MODEL);
+    const response = await generateContent(CHEAP_MODEL, [
+      {
+        text: prompt,
+      },
+    ]);
 
-    const response = await model.generateContent(prompt);
-
-    const text = response.response.text();
+    const text = response;
     console.log(text);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
 

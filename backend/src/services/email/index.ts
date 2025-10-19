@@ -1,10 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { EmailScenario } from '../../data/mockScenarios';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+import { CHEAP_MODEL } from '../config';
+import { generateContent } from '../../utils/modelUtils';
 
 export async function generateEmailFromContext(scenario: EmailScenario): Promise<{
   type: 'email';
@@ -38,10 +34,11 @@ Return your response as a JSON object with this exact format:
 Make sure the email is professional, contextual, and addresses all the key points mentioned.`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const generatedText = response.text();
+    const generatedText = await generateContent(CHEAP_MODEL, [
+      {
+        text: prompt,
+      },
+    ]);
     
     const cleanedText = generatedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const emailData = JSON.parse(cleanedText);

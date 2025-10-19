@@ -1,10 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CalendarScenario } from '../../data/mockScenarios';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+import { CHEAP_MODEL } from '../config';
+import { generateContent } from '../../utils/modelUtils';
 
 export async function generateCalendarFromContext(scenario: CalendarScenario): Promise<{
   type: 'calendar';
@@ -50,10 +46,11 @@ Return your response as a JSON object with this exact format:
 Make sure the event details are professional, contextual, and appropriate for the attendees and context provided.`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const generatedText = response.text();
+    const generatedText = await generateContent(CHEAP_MODEL, [
+      {
+        text: prompt,
+      },
+    ]);
     
     const cleanedText = generatedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const calendarData = JSON.parse(cleanedText);
