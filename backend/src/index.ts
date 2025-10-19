@@ -13,7 +13,7 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || 'http://localhost:3001,ht
 const allowedOrigins = ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
 
 app.use(cors({
-  origin: (origin, callback) => {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // In development, allow requests with no origin (Postman, mobile apps, etc.)
     if (!origin && NODE_ENV === 'development') {
       return callback(null, true);
