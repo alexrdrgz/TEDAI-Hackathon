@@ -43,20 +43,109 @@ async function updateBadgeCount() {
   }
 }
 
+// Broadcast button state update to all tabs
+async function broadcastButtonStateUpdate() {
+  try {
+    const tasks = await getTasks();
+    const pendingCount = tasks.filter(task => task.status === 'pending').length;
+    
+    console.log('[broadcastButtonStateUpdate] Sending update to all tabs, count:', pendingCount);
+    
+    // Get all tabs and send message to each
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach(tab => {
+        chrome.tabs.sendMessage(tab.id, {
+          type: 'UPDATE_BUTTON_STATE',
+          taskCount: pendingCount
+        }).catch(() => {
+          // Tab might not have content script loaded, that's okay
+        });
+      });
+    });
+  } catch (error) {
+    console.error('[broadcastButtonStateUpdate] Error:', error);
+  }
+}
+
 // Listen for messages to add tasks to queue
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Background received message:', message);
   console.log('Message type:', message.type);
   
   try {
-    if (message.type === 'ADD_TASK') {
+    if (message.type === 'OPEN_POPUP') {
+      console.log('Opening extension popup from toast notification');
+      chrome.action.openPopup().catch(() => {
+        // If openPopup fails, open in a new window
+        chrome.windows.create({
+          url: chrome.runtime.getURL('popup.html'),
+          type: 'popup',
+          width: 400,
+          height: 600
+        });
+      });
+      sendResponse({ success: true });
+      return true;
+    } else if (message.type === 'GET_PENDING_TASK_COUNT') {
+      handleGetPendingTaskCount(sendResponse).catch(error => {
+        console.error('Error handling GET_PENDING_TASK_COUNT:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+      return true; // Keep message channel open for async response
+    } else if (message.type === 'GET_PENDING_TASKS') {
+      handleGetPendingTasks(sendResponse).catch(error => {
+        console.error('Error handling GET_PENDING_TASKS:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+      return true; // Keep message channel open for async response
+    } else if (message.type === 'ADD_TASK') {
       handleAddTask(message.task).catch(error => {
         console.error('Error handling ADD_TASK:', error);
       });
       return true; // Keep message channel open for async response
     } else if (message.type === 'UPDATE_TASK') {
-      handleUpdateTask(message.taskId, message.updates).catch(error => {
+      handleUpdateTask(message.taskId, message.updates).then(() => {
+        sendResponse({ success: true });
+      }).catch(error => {
         console.error('Error handling UPDATE_TASK:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+      return true; // Keep message channel open for async response
+    } else if (message.type === 'APPROVE_TASK') {
+      console.log('[Background] Approving task:', message.taskId);
+      
+      // Get the task first to execute its action
+      getTasks().then(async (tasks) => {
+        const task = tasks.find(t => t.id === message.taskId);
+        
+        if (!task) {
+          console.error('[Background] Task not found:', message.taskId);
+          sendResponse({ success: false, error: 'Task not found' });
+          return;
+        }
+        
+        try {
+          // Execute the task action (open Gmail/Calendar)
+          await executeTaskAction(task);
+          
+          // Then update the task status
+          await handleUpdateTask(message.taskId, { status: 'approved' });
+          
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('Error handling APPROVE_TASK:', error);
+          sendResponse({ success: false, error: error.message });
+        }
+      });
+      
+      return true; // Keep message channel open for async response
+    } else if (message.type === 'REJECT_TASK') {
+      console.log('[Background] Rejecting task:', message.taskId);
+      handleUpdateTask(message.taskId, { status: 'rejected' }).then(() => {
+        sendResponse({ success: true });
+      }).catch(error => {
+        console.error('Error handling REJECT_TASK:', error);
+        sendResponse({ success: false, error: error.message });
       });
       return true; // Keep message channel open for async response
     } else if (message.type === 'GET_TASKS') {
@@ -69,6 +158,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.log('Handling ADD_TEST_EMAIL_TASK message...');
       globalThis.addTestEmailTask().then(() => {
         console.log('Email task added successfully');
+        // Notify popup to refresh
+        chrome.runtime.sendMessage({ type: 'TASKS_UPDATED' }).catch(() => {});
         sendResponse({ success: true });
       }).catch(error => {
         console.error('Error handling ADD_TEST_EMAIL_TASK:', error);
@@ -79,6 +170,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.log('Handling ADD_TEST_CALENDAR_TASK message...');
       globalThis.addTestCalendarTask().then(() => {
         console.log('Calendar task added successfully');
+        // Notify popup to refresh
+        chrome.runtime.sendMessage({ type: 'TASKS_UPDATED' }).catch(() => {});
         sendResponse({ success: true });
       }).catch(error => {
         console.error('Error handling ADD_TEST_CALENDAR_TASK:', error);
@@ -112,12 +205,14 @@ async function handleAddTask(task) {
 
 async function handleUpdateTask(taskId, updates) {
   try {
+    console.log('[handleUpdateTask] Updating task:', taskId, 'with updates:', updates);
     const tasks = await getTasks();
     const taskIndex = tasks.findIndex(task => task.id === taskId);
     
     if (taskIndex !== -1) {
       tasks[taskIndex] = { ...tasks[taskIndex], ...updates };
       await chrome.storage.local.set({ [STORAGE_KEY]: tasks });
+      console.log('[handleUpdateTask] Task updated in storage');
       await updateBadgeCount();
       
       // Handle snooze alarms
@@ -127,9 +222,101 @@ async function handleUpdateTask(taskId, updates) {
         
         chrome.alarms.create(alarmName, { when: alarmTime });
       }
+      
+      // Notify popup to refresh
+      chrome.runtime.sendMessage({ type: 'TASKS_UPDATED' }).catch(() => {
+        // Popup might not be open, that's okay
+      });
+      
+      // Update sticky button state on all tabs
+      await broadcastButtonStateUpdate();
+    } else {
+      console.log('[handleUpdateTask] Task not found:', taskId);
     }
   } catch (error) {
     console.error('Failed to update task:', error);
+  }
+}
+
+// Execute task action (open Gmail, Google Calendar, etc.)
+async function executeTaskAction(task) {
+  try {
+    console.log('[executeTaskAction] Executing action for task:', task.type, task.id);
+    
+    if (task.type === 'email') {
+      await openGmailCompose(task.data);
+    } else if (task.type === 'calendar') {
+      await openGoogleCalendar(task.data);
+    } else if (task.type === 'reminder') {
+      // Reminders could open Google Calendar or Tasks
+      await openGoogleCalendar(task.data);
+    }
+  } catch (error) {
+    console.error('[executeTaskAction] Failed to execute task action:', error);
+    throw error;
+  }
+}
+
+// Open Gmail compose window with pre-filled data
+async function openGmailCompose(emailData) {
+  console.log('[openGmailCompose] Opening Gmail compose:', emailData);
+  const params = new URLSearchParams();
+  params.append('to', emailData.to);
+  params.append('su', emailData.subject);
+  params.append('body', emailData.body);
+  
+  if (emailData.cc) params.append('cc', emailData.cc);
+  if (emailData.bcc) params.append('bcc', emailData.bcc);
+
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&${params.toString()}`;
+  
+  try {
+    await chrome.tabs.create({ url: gmailUrl });
+    console.log('[openGmailCompose] Gmail compose window opened');
+  } catch (error) {
+    console.error('[openGmailCompose] Failed to open Gmail:', error);
+    throw error;
+  }
+}
+
+// Open Google Calendar with pre-filled event data
+async function openGoogleCalendar(calendarData) {
+  console.log('[openGoogleCalendar] Opening Google Calendar:', calendarData);
+  
+  const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+  const params = new URLSearchParams();
+  params.append('text', calendarData.title);
+  
+  // Convert ISO dates to Google Calendar format
+  const startDate = new Date(calendarData.startTime);
+  const endDate = new Date(calendarData.endTime);
+  
+  const formatDate = (date) => {
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+  
+  params.append('dates', `${formatDate(startDate)}/${formatDate(endDate)}`);
+  
+  if (calendarData.description) {
+    params.append('details', calendarData.description);
+  }
+  
+  if (calendarData.location) {
+    params.append('location', calendarData.location);
+  }
+  
+  if (calendarData.attendees && calendarData.attendees.length > 0) {
+    params.append('add', calendarData.attendees.join(','));
+  }
+  
+  const url = `${baseUrl}&${params.toString()}`;
+  
+  try {
+    await chrome.tabs.create({ url });
+    console.log('[openGoogleCalendar] Google Calendar opened');
+  } catch (error) {
+    console.error('[openGoogleCalendar] Failed to open Google Calendar:', error);
+    throw error;
   }
 }
 
@@ -143,6 +330,28 @@ async function handleGetTasks(sendResponse) {
   }
 }
 
+async function handleGetPendingTaskCount(sendResponse) {
+  try {
+    const tasks = await getTasks();
+    const pendingCount = tasks.filter(task => task.status === 'pending').length;
+    sendResponse({ success: true, count: pendingCount });
+  } catch (error) {
+    console.error('Failed to get pending task count:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+async function handleGetPendingTasks(sendResponse) {
+  try {
+    const tasks = await getTasks();
+    const pendingTasks = tasks.filter(task => task.status === 'pending');
+    sendResponse({ success: true, tasks: pendingTasks });
+  } catch (error) {
+    console.error('Failed to get pending tasks:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
 // Handle snooze alarms
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name.startsWith('snooze_')) {
@@ -151,6 +360,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       status: 'pending', 
       snoozedUntil: null 
     });
+    
+    // Update button state after snooze alarm
+    await broadcastButtonStateUpdate();
   }
 });
 
@@ -191,9 +403,42 @@ async function pollForTasks() {
             headers: { 'Content-Type': 'application/json' }
           });
           newTasksAdded++;
+          
+          // Show toast notification on active tab
+          console.log('[Polling] New task detected, showing toast notification');
+          
+          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs && tabs.length > 0) {
+              const activeTab = tabs[0];
+              console.log('[Polling] Sending toast to active tab:', activeTab.id);
+              
+              chrome.tabs.sendMessage(activeTab.id, {
+                type: 'SHOW_TOAST',
+                data: task
+              }).then(() => {
+                console.log('[Polling] ✓ Toast notification sent');
+              }).catch(error => {
+                console.log('[Polling] ✗ Failed to send toast (tab might not support content scripts):', error.message);
+              });
+            } else {
+              console.log('[Polling] No active tab found for toast notification');
+            }
+          });
         }
       }
       console.log('[Polling] Added', newTasksAdded, 'new tasks');
+      
+      // Notify any open popups about the update
+      if (newTasksAdded > 0) {
+        console.log('[Polling] Broadcasting TASKS_UPDATED message to popup');
+        chrome.runtime.sendMessage({ type: 'TASKS_UPDATED' }).catch(() => {
+          // Popup might not be open, that's okay
+          console.log('[Polling] No popup open to receive update');
+        });
+        
+        // Update sticky button state on all tabs (for when tasks are cleared/completed)
+        await broadcastButtonStateUpdate();
+      }
     }
   } catch (error) {
     console.error('[Polling] Error:', error);
@@ -260,6 +505,23 @@ function startPolling() {
 // Utility function to generate unique task IDs
 function generateTaskId() {
   return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Helper function to get task summary for notifications
+function getTaskSummary(task) {
+  switch (task.type) {
+    case 'email':
+      return `To: ${task.data.to} - ${task.data.subject}`;
+    case 'calendar':
+      const startDate = new Date(task.data.startTime);
+      const timeStr = startDate.toLocaleDateString() + ' ' + startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const locationStr = task.data.location ? ` @ ${task.data.location}` : '';
+      return `${task.data.title} - ${timeStr}${locationStr}`;
+    case 'reminder':
+      return `Reminder: ${task.data.title}`;
+    default:
+      return 'New task available';
+  }
 }
 
 // Manual trigger for testing (can be called from console)

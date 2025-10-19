@@ -1,13 +1,18 @@
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshot, generateTimelineEntry } from './gemini';
+import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask, analyzeMessagingForActionItems } from './gemini';
 import { addSnapshot, getLastSessionSnapshot } from './snapshots';
 import { getSessionTimeline, addTimelineEntry } from './timeline';
+import { createTask } from './db';
 
 let isStreaming = false;
 let streamingTimeout: NodeJS.Timeout | null = null;
 let lastScreenshotTime = 0;
 let lastScreenshotPath: string | null = null;
+
+function generateTaskId(): string {
+  return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
 
 async function checkScreenDifference(referencePath: string): Promise<number> {
   return new Promise((resolve) => {
@@ -71,11 +76,56 @@ async function captureAndSaveScreenshot(filePath: string): Promise<void> {
     
     await addSnapshot(filePath, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
 
-    // Generate and append timeline entry
+    // Get current timeline for task generation
     const currentTimeline = await getSessionTimeline(sessionId);
     const timestamp = new Date().toISOString();
-    const newEntry = await generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp);
+    
+    // Generate timeline entry and check for tasks in parallel
+    const [newEntry, taskCheckResult] = await Promise.all([
+      generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp),
+      checkAndGenerateTask(filePath, summary.Caption, summary.Changes, currentTimeline, summary.FullDescription, summary.isMessagingApp)
+    ]);
+    
     await addTimelineEntry(sessionId, newEntry, summary.Caption, timestamp);
+    
+    // If this is a messaging app, use specialized action item detection
+    if (summary.isMessagingApp) {
+      console.log('📱 [Streaming] Messaging app detected - analyzing for action items...');
+      try {
+        const actionItems = await analyzeMessagingForActionItems(
+          filePath, 
+          summary.FullDescription, 
+          summary.Caption
+        );
+        
+        console.log(`[Streaming] Found ${actionItems.length} action items in messaging app`);
+        
+        // Create tasks for each detected action item
+        for (const item of actionItems) {
+          try {
+            const taskId = generateTaskId();
+            console.log(`[Streaming] Creating ${item.taskType} task from message:`, item.reasoning);
+            await createTask(taskId, item.taskType, item.taskData);
+          } catch (taskError) {
+            console.error('[Streaming] Error creating messaging action item task:', taskError);
+          }
+        }
+      } catch (messagingError) {
+        console.error('[Streaming] Error analyzing messaging app for action items:', messagingError);
+        // Fall back to regular task detection
+      }
+    }
+    
+    // Create task if recommended by regular Gemini analysis (if not handled by messaging detection)
+    if (!summary.isMessagingApp && taskCheckResult?.shouldCreate && taskCheckResult?.taskType) {
+      try {
+        const taskId = generateTaskId();
+        console.log(`[Streaming] Creating ${taskCheckResult.taskType} task:`, taskCheckResult.reasoning);
+        await createTask(taskId, taskCheckResult.taskType, taskCheckResult.taskData || {});
+      } catch (taskError) {
+        console.error('[Streaming] Error creating auto-generated task:', taskError);
+      }
+    }
   } catch (err) {
     console.error('Error processing screenshot:', err);
   }
