@@ -6,6 +6,17 @@ import { initDatabase } from './services/db';
 import { initializeTools } from './services/tools';
 import { execSync } from 'child_process';
 
+// Suppress 404 request logging to reduce console noise
+const originalLog = console.log;
+console.log = function(...args: any[]) {
+  const message = args.join(' ');
+  // Filter out 404 and poll request logs
+  if (message.includes('404') || (message.includes('GET') && message.includes('poll'))) {
+    return;
+  }
+  return originalLog.apply(console, args);
+};
+
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const NODE_ENV = process.env.NODE_ENV || 'development';

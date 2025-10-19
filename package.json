@@ -5,13 +5,14 @@
   "private": true,
   "workspaces": [
     "backend",
+    "v0-app",
     "chat-frontend"
   ],
   "scripts": {
     "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd chat-frontend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
     "wait:backend": "bash -c 'until (echo > /dev/tcp/127.0.0.1/${PORT:-3000}) >/dev/null 2>&1; do echo \"Waiting for backend on port ${PORT:-3000}...\"; sleep 0.3; done'",
-    "dev:frontend:wait": "npm run wait:backend && cd chat-frontend && npm run dev",
+    "dev:frontend:wait": "npm run wait:backend && cd frontend && npm run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend:wait\""
   },
   "keywords": ["ai", "chat", "screen-monitoring", "hackathon"],
