@@ -17,7 +17,7 @@ interface ChatMessage extends Message {
 }
 
 export function ChatInterface() {
-  const { sessionId, isLoading: sessionLoading, error: sessionError, createNewSession } = useSession()
+  const { chats, currentChatId, isLoading: sessionLoading, error: sessionError, createNewChat, switchChat } = useSession()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -36,12 +36,12 @@ export function ChatInterface() {
       })
     },
     onSilenceDetected: async (audioBlob) => {
-      if (!sessionId) return
+      if (!currentChatId) return
       
       setIsLoading(true)
       
       try {
-        const result = await sendVoiceMessage(sessionId, audioBlob)
+        const result = await sendVoiceMessage(currentChatId, audioBlob)
         
         const audioBytes = atob(result.audio)
         const audioArray = new Uint8Array(audioBytes.length)
@@ -79,12 +79,12 @@ export function ChatInterface() {
 
   // Load initial messages and start polling
   useEffect(() => {
-    if (!sessionId || sessionLoading) return
+    if (!currentChatId || sessionLoading) return
 
     const loadMessages = async () => {
       try {
         setIsInitialLoad(true)
-        const initialMessages = await getMessages(sessionId)
+        const initialMessages = await getMessages(currentChatId)
         setMessages(
           initialMessages.map((m) => ({
             ...m,
@@ -94,7 +94,7 @@ export function ChatInterface() {
 
         const lastMessageId = initialMessages.length > 0 ? Math.max(...initialMessages.map((m) => m.id)) : 0
 
-        stopPollingRef.current = startPolling(sessionId, lastMessageId, (newMessages) => {
+        stopPollingRef.current = startPolling(currentChatId, lastMessageId, (newMessages) => {
           setMessages((prev) => {
             const existingIds = new Set(prev.map((m) => m.id))
             const uniqueNewMessages = newMessages.filter((m) => !existingIds.has(m.id))
@@ -126,17 +126,17 @@ export function ChatInterface() {
         stopPollingRef.current()
       }
     }
-  }, [sessionId, sessionLoading, toast])
+  }, [currentChatId, sessionLoading, toast])
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading || !sessionId) return
+    if (!input.trim() || isLoading || !currentChatId) return
 
     const userMessage = input.trim()
     setInput("")
     setIsLoading(true)
 
     try {
-      await sendMessage(sessionId, userMessage)
+      await sendMessage(currentChatId, userMessage)
     } catch (err: any) {
       setInput(userMessage)
       toast({
@@ -208,7 +208,7 @@ export function ChatInterface() {
 
         <div className="flex-1 overflow-y-auto p-2">
           <Button
-            onClick={createNewSession}
+            onClick={createNewChat}
             className="w-full mb-4 bg-primary/80 hover:bg-primary transition-all duration-200 justify-start text-base font-medium gap-2"
           >
             <Plus className="w-4 h-4" />
@@ -216,12 +216,21 @@ export function ChatInterface() {
           </Button>
 
           <div className="space-y-1">
-            <button
-              className="w-full text-left px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 bg-[#4493F8]/20 text-[#4493F8] border border-[#4493F8]/30 text-base font-medium"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span className="truncate">Current Chat</span>
-            </button>
+            {chats.map((chat) => (
+              <button
+                key={chat.sessionId}
+                onClick={() => switchChat(chat.sessionId)}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 text-base font-medium truncate ${
+                  currentChatId === chat.sessionId
+                    ? 'bg-[#4493F8]/20 text-[#4493F8] border border-[#4493F8]/30'
+                    : 'hover:bg-secondary text-foreground border border-transparent'
+                }`}
+                title={chat.title || 'New Chat'}
+              >
+                <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate text-sm">{chat.title || 'New Chat'}</span>
+              </button>
+            ))}
           </div>
         </div>
 
