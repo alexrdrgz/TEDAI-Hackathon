@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import monitorRouter from './monitor';
 import contextRouter from './context';
+import chatRouter from './chat';
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.get('/python', (req, res) => {
 
 router.use('/monitor', monitorRouter);
 router.use('/context', contextRouter);
+router.use('/chat', chatRouter);
 
 export default router;

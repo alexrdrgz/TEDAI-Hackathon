@@ -87,3 +87,15 @@ keys/
 
 # Documentation build
 docs/_build/
+
+# Test files
+test-*.js
+test-*.html
+*-test.js
+quick-test.js
+setup-env.sh
+test-connection.sh
+
+# Verbose documentation
+IMPLEMENTATION_SUMMARY.md
+QUICK_START.md

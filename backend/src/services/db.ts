@@ -40,7 +40,35 @@ export function initDatabase(): Promise<void> {
               )`,
               (err: Error | null) => {
                 if (err) reject(err);
-                else resolve();
+                else {
+                  db.run(
+                    `CREATE TABLE IF NOT EXISTS chat_sessions (
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      session_id TEXT UNIQUE NOT NULL,
+                      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )`,
+                    (err: Error | null) => {
+                      if (err) reject(err);
+                      else {
+                        db.run(
+                          `CREATE TABLE IF NOT EXISTS chat_messages (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            session_id TEXT NOT NULL,
+                            role TEXT NOT NULL,
+                            content TEXT NOT NULL,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id)
+                          )`,
+                          (err: Error | null) => {
+                            if (err) reject(err);
+                            else resolve();
+                          }
+                        );
+                      }
+                    }
+                  );
+                }
               }
             );
           }

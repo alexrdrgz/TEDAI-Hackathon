@@ -41,10 +41,35 @@ The agent can perform common computer tasks, such as:
 - **Usage Analysis:** Insights into daily computer use, time spent on apps, tasks performed, and productivity.
 - **Visual Display:** Graphical dashboard for analytics, helping users visualize work habits and find opportunities for improvement.
 
-## Technology Stack (Proposed)
+## Technology Stack
 
-- **Front-end:** React, Vue.js (for the interface and chat)
-- **Back-end:** Python (Flask/Django), Node.js (agent logic, API handling)
-- **AI/ML:** TensorFlow, PyTorch, Hugging Face Transformers (NLP, screen analysis, task automation)
-- **Screen Monitoring:** OCR libraries, screenshot APIs, accessibility APIs (to capture and interpret screen content)
-- **Memory/Context:** Vector databases, persistent storage (to maintain conversation history and context)
+### Implemented
+- **Frontend:** React + TypeScript + Vite (standalone chat interface)
+- **Backend:** Node.js + Express + TypeScript
+- **Database:** SQLite3 (persistent storage)
+- **AI:** Google Gemini 2.5 Flash API
+- **Communication:** HTTP Long-Polling
+- **Screen Monitoring:** Python screenshot capture + Gemini vision analysis
+
+### Additional Considerations
+- **Screen Monitoring:** OCR libraries, screenshot APIs, accessibility APIs
+- **Advanced Analytics:** Vector databases for semantic search
+
+## Setup
+
+### Backend Server
+```bash
+cd backend
+npm install
+# Create .env file with GEMINI_API_KEY
+npm run dev
+```
+
+### Chat Frontend
+```bash
+cd chat-frontend
+npm install
+npm run dev
+```
+
+📖 **See [CHAT_SETUP.md](./CHAT_SETUP.md) for detailed instructions**
