@@ -572,18 +572,22 @@ function showNotification(taskData) {
 
   // Initialize swipe gesture handler
   if (typeof SwipeGestureHandler !== 'undefined') {
-    currentSwipeHandler = new SwipeGestureHandler(swipeableElement, {
-      threshold: 0.35,
-      minDistance: 80,
-      onSwipeRight: () => {
-        console.log('[StickyButton] Swipe right - Approving task:', taskData.id);
-        approveTask(taskData.id);
-      },
-      onSwipeLeft: () => {
-        console.log('[StickyButton] Swipe left - Rejecting task:', taskData.id);
-        rejectTask(taskData.id);
-      }
-    });
+    try {
+      currentSwipeHandler = new SwipeGestureHandler(swipeableElement, {
+        threshold: 0.35,
+        minDistance: 80,
+        onSwipeRight: () => {
+          approveTask(taskData.id);
+        },
+        onSwipeLeft: () => {
+          rejectTask(taskData.id);
+        }
+      });
+    } catch (error) {
+      console.error('[StickyButton] Failed to initialize swipe gestures:', error);
+    }
+  } else {
+    console.warn('[StickyButton] SwipeGestureHandler not available - swipe gestures disabled');
   }
 
   // Add event listeners to buttons (fallback)
@@ -771,18 +775,20 @@ function renderQueueView(tasks) {
     const queueItems = queueContent.querySelectorAll('.tedai-queue-item');
     queueItems.forEach(item => {
       const taskId = item.dataset.taskId;
-      new SwipeGestureHandler(item, {
-        threshold: 0.35,
-        minDistance: 80,
-        onSwipeRight: () => {
-          console.log('[StickyButton] Queue item swipe right - Approving task:', taskId);
-          approveTask(taskId);
-        },
-        onSwipeLeft: () => {
-          console.log('[StickyButton] Queue item swipe left - Rejecting task:', taskId);
-          rejectTask(taskId);
-        }
-      });
+      try {
+        new SwipeGestureHandler(item, {
+          threshold: 0.35,
+          minDistance: 80,
+          onSwipeRight: () => {
+            approveTask(taskId);
+          },
+          onSwipeLeft: () => {
+            rejectTask(taskId);
+          }
+        });
+      } catch (error) {
+        console.error('[StickyButton] Failed to initialize swipe for item:', taskId, error);
+      }
     });
 
     // Add button click handlers as fallback
@@ -867,16 +873,12 @@ function clearAutoCollapseTimeout() {
 
 // Approve task
 function approveTask(taskId) {
-  console.log('[StickyButton] Approving task:', taskId);
-  
   // Send message to background script
-  safeSendMessage({ 
+  const sent = safeSendMessage({ 
     type: 'APPROVE_TASK', 
     taskId: taskId 
   }, (response) => {
     if (response && response.success) {
-      console.log('[StickyButton] Task approved successfully');
-      
       // Refresh the view after a short delay to allow animation
       setTimeout(() => {
         if (currentState === 'notification') {
@@ -886,23 +888,23 @@ function approveTask(taskId) {
         }
       }, 350);
     } else {
-      console.log('[StickyButton] Failed to approve task');
+      console.error('[StickyButton] Failed to approve task:', response);
     }
   });
+  
+  if (!sent) {
+    console.error('[StickyButton] Failed to send approve message - extension context may be invalid');
+  }
 }
 
 // Reject task
 function rejectTask(taskId) {
-  console.log('[StickyButton] Rejecting task:', taskId);
-  
   // Send message to background script
-  safeSendMessage({ 
+  const sent = safeSendMessage({ 
     type: 'REJECT_TASK', 
     taskId: taskId 
   }, (response) => {
     if (response && response.success) {
-      console.log('[StickyButton] Task rejected successfully');
-      
       // Refresh the view after a short delay to allow animation
       setTimeout(() => {
         if (currentState === 'notification') {
@@ -912,9 +914,13 @@ function rejectTask(taskId) {
         }
       }, 350);
     } else {
-      console.log('[StickyButton] Failed to reject task');
+      console.error('[StickyButton] Failed to reject task:', response);
     }
   });
+  
+  if (!sent) {
+    console.error('[StickyButton] Failed to send reject message - extension context may be invalid');
+  }
 }
 
 // Helper function to safely send messages to background script
