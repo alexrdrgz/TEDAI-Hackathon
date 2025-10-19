@@ -188,15 +188,22 @@ router.get('/session/:sessionId/poll', async (req, res) => {
     }
 
     // No new messages, set up long-polling
+    let responseHandled = false;
+    
     const timeout = setTimeout(() => {
+      if (responseHandled) return;
+      responseHandled = true;
+      
       // Remove from pending requests
-      removePendingRequest(sessionId, res);
+      removePendingRequest(sessionId, timeout);
       
       // Return empty result after timeout
-      res.json({ 
-        success: true, 
-        messages: [] 
-      });
+      if (!res.headersSent) {
+        res.json({ 
+          success: true, 
+          messages: [] 
+        });
+      }
     }, 30000); // 30 second timeout
 
     // Store the pending request
@@ -208,18 +215,26 @@ router.get('/session/:sessionId/poll', async (req, res) => {
       sessionId,
       lastMessageId,
       resolve: (messages) => {
+        if (responseHandled) return;
+        responseHandled = true;
+        
         clearTimeout(timeout);
-        res.json({ 
-          success: true, 
-          messages 
-        });
+        if (!res.headersSent) {
+          res.json({ 
+            success: true, 
+            messages 
+          });
+        }
       },
       timeout
     });
 
     // Clean up on client disconnect
     req.on('close', () => {
-      removePendingRequest(sessionId, res);
+      if (!responseHandled) {
+        responseHandled = true;
+        removePendingRequest(sessionId, timeout);
+      }
     });
 
   } catch (error: any) {
@@ -240,26 +255,27 @@ function notifyPendingRequests(sessionId: string, newMessageId: number) {
 
   // Get new messages for all pending requests
   getSessionHistory(sessionId).then(allMessages => {
+    // Clear all pending requests for this session BEFORE resolving
+    // to prevent double-sending if timeout fires
+    pendingRequests.delete(sessionId);
+    
     requests.forEach(request => {
       const newMessages = allMessages.filter(msg => msg.id > request.lastMessageId);
       if (newMessages.length > 0) {
         request.resolve(newMessages);
       }
     });
-    
-    // Clear all pending requests for this session
-    pendingRequests.delete(sessionId);
   });
 }
 
 /**
  * Remove a specific pending request
  */
-function removePendingRequest(sessionId: string, res: any) {
+function removePendingRequest(sessionId: string, timeout: NodeJS.Timeout) {
   const requests = pendingRequests.get(sessionId);
   if (!requests) return;
 
-  const index = requests.findIndex(r => r.resolve === res);
+  const index = requests.findIndex(r => r.timeout === timeout);
   if (index !== -1) {
     clearTimeout(requests[index].timeout);
     requests.splice(index, 1);

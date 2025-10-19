@@ -145,6 +145,9 @@ export async function generateChatResponse(
           topP: 0.95,
           maxOutputTokens: 1024,
         }
+      },
+      {
+        proxy: false // Disable proxy to avoid corporate firewall blocking
       }
     );
 
