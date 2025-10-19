@@ -7,15 +7,25 @@
     "activeTab",
     "storage",
     "tabs",
-    "alarms"
+    "alarms",
+    "notifications",
+    "system.display"
   ],
   "host_permissions": [
+    "http://localhost:3030/*",
     "http://localhost:3000/*",
     "http://localhost:3001/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/utils/swipeGestures.js", "toast-notification.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "TEDAI AI Agent"

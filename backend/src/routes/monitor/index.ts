@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
 import path from 'path';
-import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask } from '../../services/gemini';
-import { addSnapshot, getLastSessionSnapshot } from '../../services/snapshots';
+import fs from 'fs';
+import { summarizeScreenshot, generateTimelineEntry, checkAndGenerateTask, analyzeMessagingForActionItems } from '../../services/gemini';
+import { addSnapshot, getLastSessionSnapshot, getSessionSnapshots, getAllSnapshots } from '../../services/snapshots';
 import { getSessionTimeline, addTimelineEntry } from '../../services/timeline';
 import { startStreaming, stopStreaming, isStreamingActive } from '../../services/streaming';
 
@@ -51,18 +52,58 @@ router.get('/screenshot', async (req, res) => {
           }
           
           // Store in database
-          await addSnapshot(filePath, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
+          const filename = path.basename(filePath);
+          await addSnapshot(filename, summary.Caption, summary.FullDescription, summary.Changes, summary.Facts, sessionId);
           
           // Get current timeline and generate new entry
           const currentTimeline = await getSessionTimeline(sessionId);
           const timestamp = new Date().toISOString();
-          const newEntry = await generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp);
+          
+          const [newEntry, taskCheckResult] = await Promise.all([
+            generateTimelineEntry(currentTimeline, summary.Caption, summary.Changes, timestamp),
+            checkAndGenerateTask(filePath, summary.Caption, summary.Changes, currentTimeline, summary.FullDescription, summary.isMessagingApp)
+          ]);
+          
           await addTimelineEntry(sessionId, newEntry, summary.Caption, timestamp);
           
-          // Check if AI should create a task using tools
-          checkAndGenerateTask(filePath, summary.Caption, summary.Changes, currentTimeline, summary.FullDescription).catch((err) => {
-            console.error('Error checking for task generation:', err);
-          });
+          // If this is a messaging app, use specialized action item detection
+          if (summary.isMessagingApp) {
+            console.log('📱 Messaging app detected - analyzing for action items...');
+            try {
+              const actionItems = await analyzeMessagingForActionItems(
+                filePath, 
+                summary.FullDescription, 
+                summary.Caption
+              );
+              
+              console.log(`Found ${actionItems.length} action items in messaging app`);
+              
+              // Create tasks for each detected action item
+              for (const item of actionItems) {
+                try {
+                  const taskId = generateTaskId();
+                  console.log(`Creating ${item.taskType} task from message:`, item.reasoning);
+                  await createTask(taskId, item.taskType, item.taskData);
+                } catch (taskError) {
+                  console.error('Error creating messaging action item task:', taskError);
+                }
+              }
+            } catch (messagingError) {
+              console.error('Error analyzing messaging app for action items:', messagingError);
+              // Fall back to regular task detection
+            }
+          }
+          
+          // Create task if recommended by regular Gemini analysis (if not handled by messaging detection)
+          if (!summary.isMessagingApp && taskCheckResult?.shouldCreate && taskCheckResult?.taskType) {
+            try {
+              const taskId = generateTaskId();
+              console.log(`Creating ${taskCheckResult.taskType} task:`, taskCheckResult.reasoning);
+              await createTask(taskId, taskCheckResult.taskType, taskCheckResult.taskData || {});
+            } catch (taskError) {
+              console.error('Error creating auto-generated task:', taskError);
+            }
+          }
           
           res.json({ 
             screenshot: filePath, 
@@ -94,6 +135,51 @@ router.get('/streaming', (req, res) => {
     stopStreaming();
     console.log('Screenshot streaming STOPPED - Monitoring is now inactive');
     res.json({ status: 'streaming stopped', isActive: isStreamingActive() });
+  }
+});
+
+router.get('/timeline/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const snapshots = await getSessionSnapshots(sessionId);
+    res.json({ success: true, snapshots });
+  } catch (error) {
+    console.error('Error fetching timeline:', error);
+    res.status(500).json({ error: 'Failed to fetch timeline' });
+  }
+});
+
+router.get('/timeline', async (req, res) => {
+  try {
+    const snapshots = await getAllSnapshots();
+    res.json({ success: true, snapshots });
+  } catch (error) {
+    console.error('Error fetching all snapshots:', error);
+    res.status(500).json({ error: 'Failed to fetch snapshots' });
+  }
+});
+
+router.get('/screenshot/:filename', (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(__dirname, '../../..', 'screenshots', filename);
+    
+    // Prevent directory traversal
+    const resolvedPath = path.resolve(filePath);
+    const screenshotsDir = path.resolve(path.join(__dirname, '../../..', 'screenshots'));
+    
+    if (!resolvedPath.startsWith(screenshotsDir)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(404).json({ error: 'Screenshot not found' });
+    }
+    
+    res.sendFile(resolvedPath);
+  } catch (error) {
+    console.error('Error serving screenshot:', error);
+    res.status(500).json({ error: 'Failed to serve screenshot' });
   }
 });
 

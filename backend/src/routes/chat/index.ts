@@ -197,9 +197,11 @@ router.get('/session/:sessionId/poll', async (req, res) => {
 
     const exists = await sessionExists(sessionId);
     if (!exists) {
-      res.status(404).json({ 
-        success: false, 
-        error: 'Session not found' 
+      // Return 200 with empty messages instead of 404 to avoid client spam
+      // The client will eventually create a valid session
+      res.json({ 
+        success: true, 
+        messages: [] 
       });
       return;
     }

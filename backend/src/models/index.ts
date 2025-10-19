@@ -5,6 +5,7 @@ export const ScreenshotSummarySchema = z.object({
   Caption: z.string().describe('A 1 sentence summary of the image, focusing on which task the user is performing'),
   Changes: z.array(z.string()).describe('Short snippets of what changed since last screenshot'),
   Facts: z.array(z.string()).max(3).describe('0-3 facts that can be learned from the screenshot'),
+  isMessagingApp: z.boolean().optional().describe('Whether the screenshot shows a messaging application'),
 });
 
 export type ScreenshotSummary = z.infer<typeof ScreenshotSummarySchema>;

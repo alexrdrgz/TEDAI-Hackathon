@@ -4,9 +4,14 @@ class ScreenshotToggle {
     this.enabled = false;
     this.toggleElement = document.getElementById('screenshotToggle');
     this.statusElement = document.getElementById('toggleStatus');
+    // Use config if available, otherwise fallback to hardcoded value
+    this.apiBaseUrl = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) 
+      ? CONFIG.API_BASE_URL 
+      : 'http://localhost:3030/api';
     
     console.log('Toggle element found:', !!this.toggleElement);
     console.log('Status element found:', !!this.statusElement);
+    console.log('API Base URL:', this.apiBaseUrl);
   }
 
   async init() {
@@ -41,7 +46,7 @@ class ScreenshotToggle {
     this.setDisabled(true);
     
     try {
-      const url = `http://localhost:3000/api/monitor/streaming?on=${newState}`;
+      const url = `${this.apiBaseUrl}/monitor/streaming?on=${newState}`;
       console.log('Making API request to:', url);
       
       const response = await fetch(url);
