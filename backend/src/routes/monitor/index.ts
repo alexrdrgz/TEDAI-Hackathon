@@ -102,11 +102,15 @@ router.get('/screenshot', async (req, res) => {
 router.get('/streaming', (req, res) => {
   const on = req.query.on === 'true';
   
+  console.log(`Monitor streaming request received: on=${on}`);
+  
   if (on) {
     startStreaming();
+    console.log('Screenshot streaming STARTED - Monitoring is now active');
     res.json({ status: 'streaming started', isActive: isStreamingActive() });
   } else {
     stopStreaming();
+    console.log('Screenshot streaming STOPPED - Monitoring is now inactive');
     res.json({ status: 'streaming stopped', isActive: isStreamingActive() });
   }
 });
